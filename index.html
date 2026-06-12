@@ -664,11 +664,11 @@ const VEH={
     arm:'DEEP-VAULT · LIVING WARSTORM · 15 storm-powers on ability buttons 1–15 · bottomless missiles · crash-proof',
     desc:'[SEALED]',ico:'living warstorm'},
   // a land dreadnought — also unlocks with the tier-2 code
-  megatank:{name:'MEGA TANK',cls:'tank',hp:1000000,acc:0.14,maxs:5.5,rev:2.8,turn:0.06,turret:0.12,
-    dmg:1000000,reload:60,shell:16,rng:1100,sz:38,col:'#2b2f38',armor:600,pen:9999,
-    missile:'ANY',misscd:120,crush:true,coax:true,smoke:true,earthshaker:true,art:'maus',secret:true,tier2:true,
-    arm:'TIER II · MEGA TANK · 1,000,000 HP · 1,000,000 dmg cannon · F: EARTHSHAKER ground-slam · auto coax MG · missiles (R) · crushes everything',
-    desc:'MEGA TANK — a land dreadnought. A million health, a cannon that deletes anything in one hit, a coaxial MG that auto-fires on anything close, guided missiles, and it flattens forests and rocks. Special: F = EARTHSHAKER — slam the ground and send a shockwave that obliterates everything it rolls over.',ico:'mega tank land dreadnought'},
+  megatank:{name:'MEGA TANK',cls:'tank',hp:10000000,acc:0.14,maxs:5.5,rev:2.8,turn:0.06,turret:0.12,
+    dmg:1000000,reload:20,shell:40,rng:1100,sz:38,col:'#2b2f38',armor:600,pen:9999,
+    missile:'ANY',misscd:120,crush:true,coax:true,smoke:true,earthshaker:true,siegestrike:true,art:'maus',secret:true,tier2:true,
+    arm:'TIER II · MEGA TANK · 10,000,000 HP · 1,000,000 dmg hyper-velocity cannon · F: EARTHSHAKER · G: SIEGE STRIKE · auto coax MG · missiles (R) · crushes everything',
+    desc:'MEGA TANK — a land dreadnought. Ten million health, a rapid hyper-velocity cannon that deletes anything in one hit, a coaxial MG that auto-fires on anything close, guided missiles, and it flattens forests and rocks. F = EARTHSHAKER (a shockwave that obliterates everything it rolls over). G = SIEGE STRIKE (a giant shell detonates wherever you aim).',ico:'mega tank land dreadnought'},
   // ===== VAULT III — orbital tier, sealed behind a third codeword =====
   aegis:{name:'[SEALED]',cls:'plane',hp:600000,acc:0.2,maxs:18.0,mins:4.0,turn:0.13,
     dmg:200,reload:1.5,shell:34,rng:1200,sz:26,col:'#c9a23a',armor:0,pen:9999,stealth:true,notarget:true,nocrash:true,
@@ -3193,6 +3193,7 @@ function handleKey(e){
   if(k==='n'&&player&&!player.dead&&player.spec.timestop)timeStop(player);
   if(k==='f'&&player&&!player.dead&&player.spec.entropy)entropyField(player);
   if(k==='f'&&player&&!player.dead&&player.spec.earthshaker)earthShaker(player);
+  if(k==='g'&&player&&!player.dead&&player.spec.siegestrike)siegeStrike(player);
   if(k==='t'&&player&&!player.dead&&player.spec.timereset)yearZero(player);
   if(k==='c'&&player&&!player.dead&&player.spec.cls==='plane')popFlares(player);
   // TEMPEST storm-powers — Q cycles the selected power, a mouse CLICK fires it.
@@ -3458,6 +3459,7 @@ function moveEnt(e){
   } // no return — let movement update run so planes don't stall
   if(e.cd>0)e.cd--;
   if(e.earthCd>0)e.earthCd--;   // MEGA TANK Earthshaker cooldown
+  if(e.siegeCd>0)e.siegeCd--;   // MEGA TANK Siege Strike cooldown
   // multi-weapon units: every carried weapon reloads in parallel; cd mirrors the selected one
   if(s.weapons){ for(let i=0;i<e.wcd.length;i++)if(e.wcd[i]>0)e.wcd[i]--; e.cd=e.wcd[e.wsel||0]; }
   if(e.flash>0)e.flash--;
@@ -3571,6 +3573,19 @@ function earthShaker(p){
   shake=Math.min(60,shake+40);
   for(let i=0;i<40;i++){const a=Math.random()*TAU,sp=Math.random()*5+2;
     parts.push({x:p.x,y:p.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:0,life:30,r:3+Math.random()*4,c:Math.random()<.5?'#caa06a':'#8a6a3a'});}
+}
+// ── MEGA TANK: Siege Strike (G) ── lob a giant shell wherever you're aiming; it detonates in a
+// huge blast that deletes everything in range.
+function siegeStrike(p){
+  if((p.siegeCd||0)>0){flash('☄ SIEGE STRIKE RECHARGING… '+Math.ceil(p.siegeCd/60)+'s');return;}
+  p.siegeCd=120;
+  const tx=mouse.wx,ty=mouse.wy,R=420;
+  shake=Math.min(60,shake+30); sfxExplode(tx,ty,true); boom(tx,ty,60,'#fb6');
+  for(const e of ents){ if(e.dead||e.team===p.team)continue; if(Math.hypot(e.x-tx,e.y-ty)<R)hit(e,1000000,p); }
+  decals.push({x:tx,y:ty,r:0,maxR:R,t:0,life:55,nuke:true});
+  for(let i=0;i<70;i++){const a=Math.random()*TAU,sp=Math.random()*7+1;
+    parts.push({x:tx,y:ty,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:0,life:34+Math.random()*30,r:3+Math.random()*6,c:Math.random()<.5?'#fb6':'#fff'});}
+  flash('☄☄☄ SIEGE STRIKE — direct hit.');
 }
 // PARADOX time-bullets — two rounds switched with Q:
 //   REVERSE (mode 0): light hit + the struck aircraft's time runs backward (snaps to where it was ~2s ago)
@@ -5620,6 +5635,7 @@ function update(){
       +(player.spec.entropy?`<br><span style="color:#caf">⌗ F: entropy field${(player.entCd||0)>0?' ('+Math.ceil(player.entCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.timereset?`<br><span style="color:#d8b6ff">⟲ T: YEAR ZERO${(player.resetCd||0)>0?' ('+Math.ceil(player.resetCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.earthshaker?`<br><span style="color:#caa06a">💥 F: earthshaker${(player.earthCd||0)>0?' ('+Math.ceil(player.earthCd/60)+'s)':' READY'}</span>`:'')
+      +(player.spec.siegestrike?`<br><span style="color:#fb6">☄ G: siege strike${(player.siegeCd||0)>0?' ('+Math.ceil(player.siegeCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.kinetic?`<br><span style="color:#7fd9ff">🛰 X: rods from God${rodCd>0?' ('+Math.ceil(rodCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.cls==='plane'?`<br><span style="color:#fc6">🔥 C: flares${(player.flareCd||0)>0?' ('+Math.ceil(player.flareCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.noGun?'<br><span style="color:#9cf">👻 STEALTH — no guns aboard</span>':'')
