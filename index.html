@@ -674,9 +674,9 @@ const VEH={
     desc:'[SEALED]',ico:'apocalypse machine'},
   // ===== VAULT V — the impossible craft, a knot in time =====
   paradox:{name:'[SEALED]',cls:'plane',hp:800000,acc:0.24,maxs:22.0,mins:0,turn:0.2,
-    dmg:0,reload:99,shell:0,rng:1500,sz:24,col:'#1b1030',armor:0,pen:9999,stealth:true,notarget:true,nocrash:true,noGun:true,
-    missile:null,misscd:0,causality:true,rewind:true,stasis:true,echofork:true,quicken:true,foresight:true,art:'paradox',secret:true,tier5:true,
-    arm:'VAULT V · A KNOT IN TIME · CLICK: predestined death · HOLD Z: rewind the whole battlefield · B: stasis field · V: echo fork · X: time-skip · G: foresight',
+    dmg:45,reload:6,shell:24,rng:1300,sz:24,col:'#1b1030',armor:0,pen:9999,stealth:true,notarget:true,nocrash:true,
+    missile:null,misscd:0,twobullets:true,rewind:true,stasis:true,echofork:true,quicken:true,foresight:true,art:'paradox',secret:true,tier5:true,
+    arm:'VAULT V · A KNOT IN TIME · CLICK: time-bullets · Q: switch REVERSE/ERASE · HOLD Z: rewind the battlefield · B: stasis · V: echo fork · X: time-skip · G: foresight',
     desc:'[SEALED]',ico:'paradox time craft'},
 };
 // global durability buff: every unit gets 50% more health
@@ -3174,6 +3174,8 @@ function handleKey(e){
   if(k==='v'&&player&&!player.dead&&player.spec.echofork)echoFork(player);
   if(k==='x'&&player&&!player.dead&&player.spec.quicken)timeSkip(player);
   if(k==='g'&&player&&!player.dead&&player.spec.foresight)foresight(player);
+  if(k==='q'&&player&&!player.dead&&player.spec.twobullets){ player.bulletMode=player.bulletMode?0:1;
+    flash(player.bulletMode?'⌦ ERASE ROUND — one-taps any plane it hits':'↺ REVERSE ROUND — rewinds the plane it hits'); e.preventDefault(); }
   if(k==='c'&&player&&!player.dead&&player.spec.cls==='plane')popFlares(player);
   // TEMPEST storm-powers — Q cycles the selected power, a mouse CLICK fires it.
   // number row 1-9,0 + Shift+1..5 jump straight to a power (then click to use).
@@ -3538,8 +3540,32 @@ function fireMain(p){
     sfxFire(true,p.x,p.y);
   }
 }
+// PARADOX time-bullets — two rounds switched with Q:
+//   REVERSE (mode 0): light hit + the struck aircraft's time runs backward (snaps to where it was ~2s ago)
+//   ERASE   (mode 1): one-tap — the plane it hits is simply erased from existence
+function fireParadoxBullet(p,a){
+  const s=p.spec, mode=p.bulletMode||0;
+  p.cd = (mode===1) ? s.reload*5 : s.reload;     // the erase round fires far slower
+  const sp=(Math.random()-.5)*0.04, col=(mode===1)?'#b89cff':'#9cf';
+  shells.push({x:p.x+Math.cos(a)*s.sz,y:p.y+Math.sin(a)*s.sz,
+    vx:Math.cos(a+sp)*s.shell,vy:Math.sin(a+sp)*s.shell,
+    dmg:s.dmg,pen:9999,team:p.team,air:true,lifeMax:s.rng/s.shell,life:s.rng/s.shell,big:false,
+    owner:p,target:pickShellTarget(p,p.x,p.y,a,p.team,true),turn:0.08,
+    paradoxBullet:true,chrono:(mode===0),erase:(mode===1)});
+  boom(p.x+Math.cos(a)*s.sz,p.y+Math.sin(a)*s.sz,5,col);
+  if(Math.random()<0.5)sfxFire(false,p.x,p.y);
+}
+function reverseEntTime(e){
+  if(e.hist2&&e.hist2.length>4){ const s=e.hist2[0];
+    e.x=s.x; e.y=s.y; e.ang=s.a; e.hp=Math.min(e.hp,s.hp);   // displace back in time; never heals them
+    e.spd=0; e.vx=0; e.vy=0; e.stunT=Math.max(e.stunT||0,30); e.hist2.length=0;
+    floatText(e.x,e.y-e.spec.sz-10,'↺ TIME REVERSED','#9cf');
+    for(let i=0;i<14;i++)parts.push({x:e.x,y:e.y,vx:(Math.random()-.5)*3,vy:(Math.random()-.5)*3,t:0,life:16,r:2,c:'#9cf'});
+  } else floatText(e.x,e.y-e.spec.sz-10,'↺','#9cf');
+}
 function fireGun(p,a){
-  const s=p.spec; if(s.noGun||s.laser)return;   // the B-2 carries no guns; lasers handled separately
+  const s=p.spec; if(s.twobullets){ fireParadoxBullet(p,a); return; }   // PARADOX: time-bullets, not lead
+  if(s.noGun||s.laser)return;   // the B-2 carries no guns; lasers handled separately
   const ov=p.ovchT>0?2:1;                        // Voltaic Overcharge: double output, half reload
   p.cd=s.reload*(p.mods.gun>0?2.4:1)*(p.ovchT>0?0.5:1);
   // jammed shooters spray wild — RQ-180 passive jammer, or a Tempest's targeting-fry (jamT)
@@ -4070,6 +4096,9 @@ function recordHistory(p){
     if(gtime%6===0)for(const e of ents)if(!e.dead&&e.team!==p.team&&Math.hypot(e.x-p.x,e.y-p.y)<700)e.jamT=Math.max(e.jamT||0,30); }
   if(s.rewind&&!p.dead){ p.hist=p.hist||[];
     p.hist.push({x:p.x,y:p.y,ang:p.ang,hp:p.hp,spd:p.spd}); if(p.hist.length>160)p.hist.shift(); }
+  // short rolling history for EVERY unit, so a REVERSE bullet can rewind whatever it hits (~2s)
+  if(!p.dead&&gtime%4===0){ p.hist2=p.hist2||[];
+    p.hist2.push({x:p.x,y:p.y,a:p.ang,hp:p.hp}); if(p.hist2.length>30)p.hist2.shift(); }
 }
 // ── X: Time-Skip ── fast-forward YOUR craft: ×1.8 speed and triple-rate cooldowns for ~5s. ──
 function timeSkip(p){
@@ -4659,6 +4688,12 @@ function updateShells(){
       // SAM missiles fly upward: they physically can't hit ground targets
       if(sh.airOnly && e.spec.cls!=='plane')continue;
       if(Math.hypot(sh.x-e.x,sh.y-e.y)<e.spec.sz*0.8){
+        if(sh.paradoxBullet){                       // PARADOX time-bullets ignore armor entirely
+          if(sh.erase){ const og=e.ghostT; e.ghostT=0; hit(e,1e9,sh.owner); e.ghostT=og;
+            boom(sh.x,sh.y,22,'#b89cff'); floatText(e.x,e.y-e.spec.sz-10,'⌦ ERASED','#caf'); }
+          else { reverseEntTime(e); hit(e,sh.dmg,sh.owner); boom(sh.x,sh.y,12,'#9cf'); }
+          sh.dead=true; break;
+        }
         const r=resolveHit(e,sh);
         const armored=(e.spec.armor||0)>0;
         if(r.pen){ hit(e,sh.dmg,sh.owner); boom(sh.x,sh.y,sh.big?12:5,sh.big?'#fb6':'#ff8');
@@ -5467,7 +5502,7 @@ function update(){
       +(player.spec.meteorStorm?`<br><span style="color:#ff7a3a">☄ B: Surtr's meteor storm${meteorStormCd>0?' ('+Math.ceil(meteorStormCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.fimbul?`<br><span style="color:#bfe8ff">❄ Z: Fimbulwinter${fimbulCd>0?' ('+Math.ceil(fimbulCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.worldEnder?`<br><span style="color:#ff5a2a">🌋 V: WORLD-ENDER${enderCd>0?' ('+Math.ceil(enderCd/60)+'s)':' READY'}</span>`:'')
-      +(player.spec.causality?`<br><span style="color:#b89cff">⌛ CLICK: predestined death</span>`:'')
+      +(player.spec.twobullets?`<br><span style="color:#b89cff">🔘 CLICK: ${player.bulletMode?'⌦ ERASE round (one-tap)':'↺ REVERSE round (rewinds hit plane)'} — Q to switch</span>`:'')
       +(player.spec.rewind?`<br><span style="color:#9cf">↺ HOLD Z: rewind time (${(timeline.length/15)|0}s banked)</span>`:'')
       +(player.spec.stasis?`<br><span style="color:#7fd9ff">⏸ B: stasis field${(player.stasisCd||0)>0?' ('+Math.ceil(player.stasisCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.echofork?`<br><span style="color:#caf">⧉ V: echo fork${(player.echoCd||0)>0?' ('+Math.ceil(player.echoCd/60)+'s)':' READY'}</span>`:'')
@@ -5927,7 +5962,7 @@ const VAULT4={h:3213146314,len:8,
   hint:'the twilight of the gods — the doom that ends every world. eight letters of Norse fire. type it anywhere.'};
 const VAULT5={h:722173933,len:7,
   name:'PARADOX',
-  desc:'PARADOX — a knot in time, not a machine. No guns. CLICK = Predestined Death (mark foes; their end has already happened) · HOLD Z = Rewind Time (the WHOLE battlefield runs backwards — wrecked aircraft return to life, the score un-happens — for as long as you hold it) · B = Stasis Field (freeze enemies AND their bullets; when it lifts, the bullets fly back) · V = Echo Fork (split into time-echoes that hunt for you) · X = Time-Skip (fast-forward yourself: ×1.8 speed & rapid cooldowns) · G = Foresight (slip ahead of the timeline — untouchable, enemy aim scrambled). Crash-proof, unseeable.',
+  desc:'PARADOX — a knot in time. CLICK fires time-bullets, Q switches between them: ↺ REVERSE (the struck aircraft\'s time runs backward — it snaps to where it was seconds ago) and ⌦ ERASE (one-tap — the plane it hits is simply deleted). HOLD Z = Rewind Time (the WHOLE battlefield runs backwards — wrecked aircraft return to life, the score un-happens — for as long as you hold it) · B = Stasis Field (freeze enemies AND their bullets; when it lifts, the bullets fly back) · V = Echo Fork (split into time-echoes that hunt for you) · X = Time-Skip (fast-forward yourself: ×1.8 speed & rapid cooldowns) · G = Foresight (slip ahead of the timeline — untouchable, enemy aim scrambled). Crash-proof, unseeable.',
   msg:'⌛⌛⌛ VAULT V BREACHED — PARADOX EXISTS NOW. AND ALWAYS DID.',
   hint:'a thing that contradicts itself and is true anyway — a knot in time. seven letters. type it anywhere.'};
 let secretBuf='';
