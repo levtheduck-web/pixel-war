@@ -6066,12 +6066,23 @@ const VAULT5={h:722173933,len:7,
   hint:'a thing that contradicts itself and is true anyway — a knot in time. seven letters. type it anywhere.'};
 let secretBuf='';
 addEventListener('keydown',e=>{
-  if(e.key&&e.key.length===1){ secretBuf=(secretBuf+e.key.toLowerCase()).slice(-12);
+  if(e.key&&e.key.length===1){ secretBuf=(secretBuf+e.key.toLowerCase()).slice(-24);
     const c1=secretBuf.slice(-VAULT.len);   // tier-1 code (knvd, 4)
     const c2=secretBuf.slice(-VAULT2.len);  // tier-2 code (tmpst, 5)
     const c3=secretBuf.slice(-VAULT3.len);  // tier-3 code (aegis, 5)
     const c4=secretBuf.slice(-VAULT4.len);  // tier-4 code (ragnarok, 8)
     const c5=secretBuf.slice(-VAULT5.len);  // tier-5 code (paradox, 7)
+    // ★ MEGA CODE ★ — unlocks every classified airframe at once
+    if(secretBuf.endsWith('levisthebestcoder')&&!SECRET.cleared5){
+      SECRET.cleared=SECRET.cleared2=SECRET.cleared3=SECRET.cleared4=SECRET.cleared5=true;
+      VEH.umbra.name=unveil(VAULT.name,'knvd'); VEH.umbra.ico=unveil(VAULT.ico,'knvd'); VEH.umbra.desc=unveil(VAULT.desc,'knvd');
+      VEH.tempest.name=unveil(VAULT2.name,'tmpst'); VEH.tempest.ico=unveil(VAULT2.ico,'tmpst'); VEH.tempest.desc=unveil(VAULT2.desc,'tmpst');
+      VEH.aegis.name=VAULT3.name; VEH.aegis.desc=VAULT3.desc;
+      VEH.ragnarok.name=VAULT4.name; VEH.ragnarok.desc=VAULT4.desc;
+      VEH.paradox.name=VAULT5.name; VEH.paradox.desc=VAULT5.desc;
+      flash('★★★ MEGA CODE — EVERY AIRFRAME UNLOCKED ★★★');
+      buildCards('picker',startGame); renderIntel(); return;
+    }
     if(!SECRET.cleared&&vhash(c1)===VAULT.h){
       SECRET.cleared=true;
       VEH.umbra.name=unveil(VAULT.name,c1);
