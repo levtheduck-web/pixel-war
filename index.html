@@ -676,7 +676,7 @@ const VEH={
   paradox:{name:'[SEALED]',cls:'plane',hp:800000,acc:0.24,maxs:22.0,mins:0,turn:0.2,
     dmg:0,reload:99,shell:0,rng:1500,sz:24,col:'#1b1030',armor:0,pen:9999,stealth:true,notarget:true,nocrash:true,noGun:true,
     missile:null,misscd:0,causality:true,rewind:true,stasis:true,echofork:true,quicken:true,foresight:true,art:'paradox',secret:true,tier5:true,
-    arm:'VAULT V · A KNOT IN TIME · CLICK: predestined death · Z: rewind · B: stasis field · V: echo fork · X: time-skip · G: foresight',
+    arm:'VAULT V · A KNOT IN TIME · CLICK: predestined death · HOLD Z: rewind the whole battlefield · B: stasis field · V: echo fork · X: time-skip · G: foresight',
     desc:'[SEALED]',ico:'paradox time craft'},
 };
 // global durability buff: every unit gets 50% more health
@@ -3170,7 +3170,6 @@ function handleKey(e){
   if(k==='z'&&player&&!player.dead&&player.spec.fimbul)fimbulwinter(player);
   if(k==='v'&&player&&!player.dead&&player.spec.orbitalLance)orbitalLance(player);
   if(k==='v'&&player&&!player.dead&&player.spec.worldEnder)worldEnder(player);
-  if(k==='z'&&player&&!player.dead&&player.spec.rewind)rewind(player);
   if(k==='b'&&player&&!player.dead&&player.spec.stasis)stasisField(player);
   if(k==='v'&&player&&!player.dead&&player.spec.echofork)echoFork(player);
   if(k==='x'&&player&&!player.dead&&player.spec.quicken)timeSkip(player);
@@ -4023,8 +4022,9 @@ function drawEnderOverlay(){
   ctx.save();ctx.globalAlpha=(enderFlash/55)*0.6;ctx.fillStyle='#ff3a10';ctx.fillRect(0,0,W,H);ctx.restore();
 }
 
-// ===================== VAULT V — PARADOX · four original time-mechanics =====================
+// ===================== VAULT V — PARADOX · original time-mechanics =====================
 let stasisFields=[];
+let rewinding=false, timeline=[], tidc=0;   // world-state ring buffer for global Rewind (hold Z)
 
 // ── CLICK: Predestined Death ── mark every foe near the cursor; 1.5s later their end simply
 // happens — damage that bypasses shields/ghosting, because in this timeline they are already gone.
@@ -4085,15 +4085,7 @@ function foresight(p){
   flash('👁👁👁 FORESIGHT — you dodge what has not happened yet.');
   blip(900,300,0.25,'sine',0.2,p.x,p.y);
 }
-function rewind(p){
-  if((p.rewindCd||0)>0){flash('⌛ REWIND RECHARGING… '+Math.ceil(p.rewindCd/60)+'s');return;}
-  if(!p.hist||p.hist.length<12){flash('⌛ not enough timeline recorded yet');return;}
-  p.rewindCd=300; const s=p.hist[0];
-  for(const h of p.hist)if(Math.random()<0.3)parts.push({x:h.x,y:h.y,vx:0,vy:0,t:0,life:16,r:3,c:'#9cf'});
-  p.x=s.x;p.y=s.y;p.ang=s.ang;p.spd=s.spd; p.hp=Math.max(p.hp,s.hp);
-  p.vx=Math.cos(p.ang)*p.spd; p.vy=Math.sin(p.ang)*p.spd; p.hist.length=0;
-  flash('⌛⌛⌛ REWIND — that damage never happened.'); shake=Math.min(60,shake+10);
-}
+// (the old single-craft rewind is replaced by the global hold-Z Rewind below)
 
 // ── B: Stasis Field ── a bubble where time stops: enemies freeze mid-air and so do their bullets.
 // when the field lifts, every frozen round flies back the way it came — at the people who fired it.
@@ -4155,6 +4147,63 @@ function updateEchoes(){
       if(best){ e.echoFire=42; best.fateT=Math.max(best.fateT||0,90); best.fateBy=e;
         for(let i=0;i<6;i++){const a=Math.random()*TAU;parts.push({x:best.x,y:best.y,vx:Math.cos(a)*2,vy:Math.sin(a)*2,t:0,life:14,r:2,c:'#b89cff'});} } }
   }
+}
+
+// ── HOLD Z: Rewind Time (the WHOLE world) ── while flying PARADOX, record the entire battlefield
+// every few frames; holding Z plays it backwards — wrecks un-happen, the dead return, the score
+// counts down — for as long as the timeline lasts (~2 minutes) and you keep holding.
+function recordTimeline(){
+  if(rewinding||!started||planMode||NET.mode==='client')return;
+  if(!(player&&player.spec&&player.spec.rewind))return;     // only while you're the PARADOX
+  if(gtime%4!==0)return;                                     // ~15 snapshots/sec
+  const e=ents.map(ent=>{ if(!ent.tid)ent.tid=++tidc;
+    return {id:ent.tid,k:ent.key,t:ent.team,x:Math.round(ent.x),y:Math.round(ent.y),
+      a:+ent.ang.toFixed(2),hp:Math.round(ent.hp),mh:ent.maxhp,d:ent.dead?1:0,
+      ai:ent.ai?1:0,rm:ent.remote?1:0,ip:(ent===player)?1:0,
+      md:[ent.mods.engine|0,ent.mods.gun|0,ent.mods.tracks|0]}; });
+  timeline.push({sc:[SCORE.blue,SCORE.red],e});
+  if(timeline.length>1800)timeline.shift();                  // cap memory (~2 min of history)
+}
+function applyTimeline(snap){
+  if(!snap)return;
+  SCORE.blue=snap.sc[0]; SCORE.red=snap.sc[1];
+  if(SCORE.blue<SCORE.goal&&SCORE.red<SCORE.goal)SCORE.over=false;   // un-end the match
+  const byId={}; for(const e of ents)byId[e.tid]=e;
+  const keep=new Set();
+  for(const o of snap.e){ keep.add(o.id);
+    let e=byId[o.id];
+    if(!e){ e=makeVeh(o.k,o.t,o.x,o.y); e.tid=o.id; ents.push(e); }   // a unit that was alive back then
+    e.x=o.x; e.y=o.y; e.ang=o.a; e.hp=o.hp; e.maxhp=o.mh; e.dead=!!o.d;   // resurrects if it had died since
+    e.ai=!!o.ai; e.remote=!!o.rm; e.vx=0; e.vy=0; e.spd=0;
+    e.mods={engine:o.md[0],gun:o.md[1],tracks:o.md[2]};
+    if(o.ip)player=e;
+  }
+  for(let i=ents.length-1;i>=0;i--){ if(ents[i]===player)continue;
+    if(!keep.has(ents[i].tid))ents.splice(i,1); }   // un-spawn things that hadn't appeared yet
+}
+function timeRewindStep(){
+  gtime++;
+  document.getElementById('respawn').style.display='none';
+  document.getElementById('over').style.display='none';
+  shells.length=0; missiles.length=0;                 // no shots fly while time runs backward
+  if(timeline.length>1){ timeline.pop(); applyTimeline(timeline[timeline.length-1]); }
+  if(player){ cam.x=clamp(player.x-W/(2*CAM_ZOOM),0,WORLD-W/CAM_ZOOM); cam.y=clamp(player.y-H/(2*CAM_ZOOM),0,WORLD-H/CAM_ZOOM); }
+  shake*=0.8;
+  const bs=document.getElementById('bscore'),rs=document.getElementById('rscore');
+  if(bs)bs.textContent=SCORE.blue; if(rs)rs.textContent=SCORE.red;
+  if(NET.mode==='host'){ try{netHostBroadcast();}catch(e){} }   // clients watch the rewind too
+}
+function drawRewindOverlay(){
+  if(!rewinding)return;
+  ctx.save();
+  ctx.globalAlpha=0.12;ctx.fillStyle='#6cf';ctx.fillRect(0,0,W,H);
+  ctx.globalAlpha=0.05;ctx.fillStyle='#fff';
+  for(let y=(gtime*6)%12;y<H;y+=12)ctx.fillRect(0,y,W,2);
+  ctx.globalAlpha=0.9;ctx.fillStyle='#cfeeff';ctx.textAlign='center';
+  ctx.font='bold 30px ui-monospace,monospace';ctx.fillText('◀◀ REWINDING TIME',W/2,56);
+  ctx.font='13px ui-monospace,monospace';
+  ctx.fillText(timeline.length>1?((timeline.length/15)|0)+'s of timeline left — release Z to stop':'start of the timeline',W/2,78);
+  ctx.restore();
 }
 
 // ========================= TEMPEST — living warstorm · 15 storm-powers =========================
@@ -5287,6 +5336,9 @@ function drawReticle(){
 let gtime=0, started=false, paused=true;
 function loop(){
   if(NET.mode==='client'){ try{clientTick();}catch(err){showErr('⚠ net client: '+err.message);} render(); requestAnimationFrame(loop); return; }
+  // PARADOX: hold Z to run the entire battlefield backwards in time
+  rewinding=!!(player&&player.spec&&player.spec.rewind&&keys['z']&&started&&!planMode);
+  if(rewinding){ try{timeRewindStep();}catch(err){showErr('⚠ rewind: '+err.message);} render(); requestAnimationFrame(loop); return; }
   if(!paused){update();}
   render();
   if(NET.mode==='host'){ try{netHostBroadcast();}catch(err){showErr('⚠ net host: '+err.message);} }
@@ -5338,6 +5390,7 @@ function update(){
     if(gtime%10===0)sfxFire(false,player.x,player.y);
   }
   for(const e of ents){ if(e.dead)continue; if(e.ai&&e!==player)aiThink(e); moveEnt(e); turretTick(e); recordHistory(e); }
+  recordTimeline();   // PARADOX: snapshot the whole battlefield for Rewind
   collideCrashes();
   // recon radio net: spotter units paint nearby stealth/concealed enemies for their whole team
   if(gtime%15===0)for(const sp of ents){ if(sp.dead||!sp.spec.spotter)continue;
@@ -5411,7 +5464,7 @@ function update(){
       +(player.spec.fimbul?`<br><span style="color:#bfe8ff">❄ Z: Fimbulwinter${fimbulCd>0?' ('+Math.ceil(fimbulCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.worldEnder?`<br><span style="color:#ff5a2a">🌋 V: WORLD-ENDER${enderCd>0?' ('+Math.ceil(enderCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.causality?`<br><span style="color:#b89cff">⌛ CLICK: predestined death</span>`:'')
-      +(player.spec.rewind?`<br><span style="color:#9cf">↺ Z: rewind${(player.rewindCd||0)>0?' ('+Math.ceil(player.rewindCd/60)+'s)':' READY'}</span>`:'')
+      +(player.spec.rewind?`<br><span style="color:#9cf">↺ HOLD Z: rewind time (${(timeline.length/15)|0}s banked)</span>`:'')
       +(player.spec.stasis?`<br><span style="color:#7fd9ff">⏸ B: stasis field${(player.stasisCd||0)>0?' ('+Math.ceil(player.stasisCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.echofork?`<br><span style="color:#caf">⧉ V: echo fork${(player.echoCd||0)>0?' ('+Math.ceil(player.echoCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.quicken?`<br><span style="color:#cbb6ff">⏩ X: time-skip${(player.skipT||0)>0?' ACTIVE':((player.skipCd||0)>0?' ('+Math.ceil(player.skipCd/60)+'s)':' READY')}</span>`:'')
@@ -5487,6 +5540,7 @@ function render(){
   ctx.restore(); // back to screen-space for UI
   drawFimbulOverlay();   // RAGNAROK's Fimbulwinter freezes the whole screen pale
   drawEnderOverlay();    // World-Ender flash
+  drawRewindOverlay();   // PARADOX rewinding the whole battlefield
   // war-film vignette (cached per resize)
   if(!render.vig||render.vw!==W||render.vh!==H){
     const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.45,W/2,H/2,Math.max(W,H)*0.72);
@@ -5869,7 +5923,7 @@ const VAULT4={h:3213146314,len:8,
   hint:'the twilight of the gods — the doom that ends every world. eight letters of Norse fire. type it anywhere.'};
 const VAULT5={h:722173933,len:7,
   name:'PARADOX',
-  desc:'PARADOX — a knot in time, not a machine. No guns. CLICK = Predestined Death (mark foes; their end has already happened) · Z = Rewind (snap back through time, undoing your last ~2.5s of damage & motion) · B = Stasis Field (freeze enemies AND their bullets; when it lifts, the bullets fly back) · V = Echo Fork (split into time-echoes that hunt for you) · X = Time-Skip (fast-forward yourself: ×1.8 speed & rapid cooldowns) · G = Foresight (slip ahead of the timeline — untouchable, enemy aim scrambled). Crash-proof, unseeable.',
+  desc:'PARADOX — a knot in time, not a machine. No guns. CLICK = Predestined Death (mark foes; their end has already happened) · HOLD Z = Rewind Time (the WHOLE battlefield runs backwards — wrecked aircraft return to life, the score un-happens — for as long as you hold it) · B = Stasis Field (freeze enemies AND their bullets; when it lifts, the bullets fly back) · V = Echo Fork (split into time-echoes that hunt for you) · X = Time-Skip (fast-forward yourself: ×1.8 speed & rapid cooldowns) · G = Foresight (slip ahead of the timeline — untouchable, enemy aim scrambled). Crash-proof, unseeable.',
   msg:'⌛⌛⌛ VAULT V BREACHED — PARADOX EXISTS NOW. AND ALWAYS DID.',
   hint:'a thing that contradicts itself and is true anyway — a knot in time. seven letters. type it anywhere.'};
 let secretBuf='';
