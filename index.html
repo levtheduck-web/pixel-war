@@ -675,8 +675,8 @@ const VEH={
   // ===== VAULT V — the impossible craft, a knot in time =====
   paradox:{name:'[SEALED]',cls:'plane',hp:800000,acc:0.24,maxs:22.0,mins:0,turn:0.2,
     dmg:0,reload:99,shell:0,rng:1500,sz:24,col:'#1b1030',armor:0,pen:9999,stealth:true,notarget:true,nocrash:true,noGun:true,
-    missile:null,misscd:0,causality:true,rewind:true,stasis:true,echofork:true,art:'paradox',secret:true,tier5:true,
-    arm:'VAULT V · A KNOT IN TIME · CLICK: predestined death · Z: rewind your own timeline · B: stasis field · V: echo fork',
+    missile:null,misscd:0,causality:true,rewind:true,stasis:true,echofork:true,quicken:true,foresight:true,art:'paradox',secret:true,tier5:true,
+    arm:'VAULT V · A KNOT IN TIME · CLICK: predestined death · Z: rewind · B: stasis field · V: echo fork · X: time-skip · G: foresight',
     desc:'[SEALED]',ico:'paradox time craft'},
 };
 // global durability buff: every unit gets 50% more health
@@ -3173,6 +3173,8 @@ function handleKey(e){
   if(k==='z'&&player&&!player.dead&&player.spec.rewind)rewind(player);
   if(k==='b'&&player&&!player.dead&&player.spec.stasis)stasisField(player);
   if(k==='v'&&player&&!player.dead&&player.spec.echofork)echoFork(player);
+  if(k==='x'&&player&&!player.dead&&player.spec.quicken)timeSkip(player);
+  if(k==='g'&&player&&!player.dead&&player.spec.foresight)foresight(player);
   if(k==='c'&&player&&!player.dead&&player.spec.cls==='plane')popFlares(player);
   // TEMPEST storm-powers — Q cycles the selected power, a mouse CLICK fires it.
   // number row 1-9,0 + Shift+1..5 jump straight to a power (then click to use).
@@ -3289,6 +3291,7 @@ function controlPlayer(p){
     let maxs=s.maxs*(1+0.5*p.fold), turn=s.turn*(1-0.72*p.fold);
     if(p.siegeT>0)maxs*=1.4;            // Siege Weather: tailwind corridor
     if(p.dashT>0)maxs*=1.8;             // Skybreaker Dive lunge
+    if(p.skipT>0)maxs*=1.8;             // PARADOX Time-Skip: fast-forward
     // throttle
     if(keys['w'])p.spd=Math.min(maxs,p.spd+s.acc);
     if(keys['s'])p.spd=Math.max(s.mins,p.spd-s.acc);
@@ -4052,10 +4055,35 @@ function drawFate(){
 // ── Z: Rewind ── snap your own craft back ~2.6s through its recorded timeline, restoring that
 // past position AND the health you had then. damage you just took? it never happened.
 function recordHistory(p){
-  if(!p||!p.spec.rewind)return;
-  if((p.rewindCd||0)>0)p.rewindCd--;
-  p.hist=p.hist||[]; if(p.dead)return;
-  p.hist.push({x:p.x,y:p.y,ang:p.ang,hp:p.hp,spd:p.spd}); if(p.hist.length>160)p.hist.shift();
+  if(!p)return; const s=p.spec; if(!s)return;
+  const fast=(p.skipT>0)?2:1;                       // Time-Skip recharges everything faster
+  if(s.causality&&p.causalCd>0)p.causalCd=Math.max(0,p.causalCd-fast);
+  if(s.rewind&&p.rewindCd>0)p.rewindCd=Math.max(0,p.rewindCd-fast);
+  if(s.stasis&&p.stasisCd>0)p.stasisCd=Math.max(0,p.stasisCd-fast);
+  if(s.echofork&&p.echoCd>0)p.echoCd=Math.max(0,p.echoCd-fast);
+  if(s.quicken&&p.skipCd>0)p.skipCd--;
+  if(s.foresight&&p.foreCd>0)p.foreCd--;
+  // Time-Skip: fast-forwarding yourself leaves a smear of after-images
+  if(p.skipT>0){ p.skipT--; if(gtime%3===0)parts.push({x:p.x,y:p.y,vx:0,vy:0,t:0,life:12,r:3,c:'#cbb6ff'}); }
+  // Foresight: slip the timeline — untouchable, and nearby enemy aim goes haywire
+  if(p.foreT>0){ p.foreT--; p.ghostT=Math.max(p.ghostT||0,3);
+    if(gtime%6===0)for(const e of ents)if(!e.dead&&e.team!==p.team&&Math.hypot(e.x-p.x,e.y-p.y)<700)e.jamT=Math.max(e.jamT||0,30); }
+  if(s.rewind&&!p.dead){ p.hist=p.hist||[];
+    p.hist.push({x:p.x,y:p.y,ang:p.ang,hp:p.hp,spd:p.spd}); if(p.hist.length>160)p.hist.shift(); }
+}
+// ── X: Time-Skip ── fast-forward YOUR craft: ×1.8 speed and triple-rate cooldowns for ~5s. ──
+function timeSkip(p){
+  if((p.skipCd||0)>0){flash('⏩ TIME-SKIP RECHARGING… '+Math.ceil(p.skipCd/60)+'s');return;}
+  p.skipCd=540; p.skipT=300;
+  flash('⏩⏩⏩ TIME-SKIP — you fast-forward; the world slows to watch.');
+  blip(400,1600,0.2,'sawtooth',0.22,p.x,p.y);
+}
+// ── G: Foresight ── slip a few seconds ahead of the timeline: untouchable, enemy aim scrambled. ──
+function foresight(p){
+  if((p.foreCd||0)>0){flash('👁 FORESIGHT RECHARGING… '+Math.ceil(p.foreCd/60)+'s');return;}
+  p.foreCd=720; p.foreT=240;
+  flash('👁👁👁 FORESIGHT — you dodge what has not happened yet.');
+  blip(900,300,0.25,'sine',0.2,p.x,p.y);
 }
 function rewind(p){
   if((p.rewindCd||0)>0){flash('⌛ REWIND RECHARGING… '+Math.ceil(p.rewindCd/60)+'s');return;}
@@ -5386,6 +5414,8 @@ function update(){
       +(player.spec.rewind?`<br><span style="color:#9cf">↺ Z: rewind${(player.rewindCd||0)>0?' ('+Math.ceil(player.rewindCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.stasis?`<br><span style="color:#7fd9ff">⏸ B: stasis field${(player.stasisCd||0)>0?' ('+Math.ceil(player.stasisCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.echofork?`<br><span style="color:#caf">⧉ V: echo fork${(player.echoCd||0)>0?' ('+Math.ceil(player.echoCd/60)+'s)':' READY'}</span>`:'')
+      +(player.spec.quicken?`<br><span style="color:#cbb6ff">⏩ X: time-skip${(player.skipT||0)>0?' ACTIVE':((player.skipCd||0)>0?' ('+Math.ceil(player.skipCd/60)+'s)':' READY')}</span>`:'')
+      +(player.spec.foresight?`<br><span style="color:#9df">👁 G: foresight${(player.foreT||0)>0?' ACTIVE':((player.foreCd||0)>0?' ('+Math.ceil(player.foreCd/60)+'s)':' READY')}</span>`:'')
       +(player.spec.kinetic?`<br><span style="color:#7fd9ff">🛰 X: rods from God${rodCd>0?' ('+Math.ceil(rodCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.cls==='plane'?`<br><span style="color:#fc6">🔥 C: flares${(player.flareCd||0)>0?' ('+Math.ceil(player.flareCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.noGun?'<br><span style="color:#9cf">👻 STEALTH — no guns aboard</span>':'')
@@ -5839,7 +5869,7 @@ const VAULT4={h:3213146314,len:8,
   hint:'the twilight of the gods — the doom that ends every world. eight letters of Norse fire. type it anywhere.'};
 const VAULT5={h:722173933,len:7,
   name:'PARADOX',
-  desc:'PARADOX — a knot in time, not a machine. It carries no guns. CLICK = Predestined Death (mark foes; their end has already happened) · Z = Rewind (snap your own craft back through time, undoing the last 2.5s of damage & motion) · B = Stasis Field (freeze enemies AND their bullets in time; when it lifts, the bullets fly back) · V = Echo Fork (split into time-echoes of yourself that hunt for you). Crash-proof, unseeable.',
+  desc:'PARADOX — a knot in time, not a machine. No guns. CLICK = Predestined Death (mark foes; their end has already happened) · Z = Rewind (snap back through time, undoing your last ~2.5s of damage & motion) · B = Stasis Field (freeze enemies AND their bullets; when it lifts, the bullets fly back) · V = Echo Fork (split into time-echoes that hunt for you) · X = Time-Skip (fast-forward yourself: ×1.8 speed & rapid cooldowns) · G = Foresight (slip ahead of the timeline — untouchable, enemy aim scrambled). Crash-proof, unseeable.',
   msg:'⌛⌛⌛ VAULT V BREACHED — PARADOX EXISTS NOW. AND ALWAYS DID.',
   hint:'a thing that contradicts itself and is true anyway — a knot in time. seven letters. type it anywhere.'};
 let secretBuf='';
