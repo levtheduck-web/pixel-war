@@ -6100,6 +6100,15 @@ const VAULT5={h:722173933,len:7,
   desc:'PARADOX — a knot in time. CLICK fires time-bullets, Q switches between them: ↺ REVERSE (the struck aircraft\'s time runs backward — it snaps to where it was seconds ago) and ⌦ ERASE (one-tap — the plane it hits is simply deleted). HOLD Z = Rewind Time (the WHOLE battlefield runs backwards — wrecked aircraft return to life, the score un-happens — for as long as you hold it) · B = Stasis Field (freeze enemies AND their bullets; when it lifts, the bullets fly back) · V = Echo Fork (split into time-echoes that hunt for you) · X = Time-Skip (fast-forward yourself: ×1.8 speed & rapid cooldowns) · G = Foresight (slip ahead of the timeline — untouchable, enemy aim scrambled). Crash-proof, unseeable.',
   msg:'⌛⌛⌛ VAULT V BREACHED — PARADOX EXISTS NOW. AND ALWAYS DID.',
   hint:'a thing that contradicts itself and is true anyway — a knot in time. seven letters. type it anywhere.'};
+// unlock every airframe up to tier n (used by the short menu codes)
+function unlockTo(n){
+  if(n>=1&&!SECRET.cleared){SECRET.cleared=true;VEH.umbra.name=unveil(VAULT.name,'knvd');VEH.umbra.ico=unveil(VAULT.ico,'knvd');VEH.umbra.desc=unveil(VAULT.desc,'knvd');}
+  if(n>=2&&!SECRET.cleared2){SECRET.cleared2=true;VEH.tempest.name=unveil(VAULT2.name,'tmpst');VEH.tempest.ico=unveil(VAULT2.ico,'tmpst');VEH.tempest.desc=unveil(VAULT2.desc,'tmpst');}
+  if(n>=3&&!SECRET.cleared3){SECRET.cleared3=true;VEH.aegis.name=VAULT3.name;VEH.aegis.desc=VAULT3.desc;}
+  if(n>=4&&!SECRET.cleared4){SECRET.cleared4=true;VEH.ragnarok.name=VAULT4.name;VEH.ragnarok.desc=VAULT4.desc;}
+  if(n>=5&&!SECRET.cleared5){SECRET.cleared5=true;VEH.paradox.name=VAULT5.name;VEH.paradox.desc=VAULT5.desc;}
+  buildCards('picker',startGame); renderIntel();
+}
 let secretBuf='';
 addEventListener('keydown',e=>{
   if(e.key&&e.key.length===1){ secretBuf=(secretBuf+e.key.toLowerCase()).slice(-24);
@@ -6108,16 +6117,13 @@ addEventListener('keydown',e=>{
     const c3=secretBuf.slice(-VAULT3.len);  // tier-3 code (aegis, 5)
     const c4=secretBuf.slice(-VAULT4.len);  // tier-4 code (ragnarok, 8)
     const c5=secretBuf.slice(-VAULT5.len);  // tier-5 code (paradox, 7)
-    // ★ MEGA CODE ★ — unlocks every classified airframe at once
-    if(secretBuf.endsWith('levisthebestcoder')&&!SECRET.cleared5){
-      SECRET.cleared=SECRET.cleared2=SECRET.cleared3=SECRET.cleared4=SECRET.cleared5=true;
-      VEH.umbra.name=unveil(VAULT.name,'knvd'); VEH.umbra.ico=unveil(VAULT.ico,'knvd'); VEH.umbra.desc=unveil(VAULT.desc,'knvd');
-      VEH.tempest.name=unveil(VAULT2.name,'tmpst'); VEH.tempest.ico=unveil(VAULT2.ico,'tmpst'); VEH.tempest.desc=unveil(VAULT2.desc,'tmpst');
-      VEH.aegis.name=VAULT3.name; VEH.aegis.desc=VAULT3.desc;
-      VEH.ragnarok.name=VAULT4.name; VEH.ragnarok.desc=VAULT4.desc;
-      VEH.paradox.name=VAULT5.name; VEH.paradox.desc=VAULT5.desc;
-      flash('★★★ MEGA CODE — EVERY AIRFRAME UNLOCKED ★★★');
-      buildCards('picker',startGame); renderIntel(); return;
+    // ★ SHORT CODES ★ — quick unlocks (typed on the menu): all/lev = everything, t1..t5 = up to that tier
+    if(!started){
+      let sc=0;
+      if(secretBuf.endsWith('all')||secretBuf.endsWith('lev'))sc=5;
+      else if(secretBuf.endsWith('t5'))sc=5; else if(secretBuf.endsWith('t4'))sc=4;
+      else if(secretBuf.endsWith('t3'))sc=3; else if(secretBuf.endsWith('t2'))sc=2; else if(secretBuf.endsWith('t1'))sc=1;
+      if(sc){ unlockTo(sc); flash('★ UNLOCKED — '+(sc===5?'every airframe':'tiers 1–'+sc)+' ★'); return; }
     }
     if(!SECRET.cleared&&vhash(c1)===VAULT.h){
       SECRET.cleared=true;
