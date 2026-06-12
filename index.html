@@ -475,7 +475,7 @@ const VEH={
     arm:'M7-6 flame gun on the M48 Patton hull — napalm sticks & burns',
     desc:'"The Zippo" — US flame tank. Close-range incinerator: napalm ignores armor and victims keep burning after the stream stops.',ico:'m67 zippo flame tank'},
   meat:{name:'The Meat',cls:'tank',hp:300,acc:0.15,maxs:3.7,rev:1.9,turn:0.05,turret:0.09,
-    dmg:8,reload:3,shell:9,rng:300,sz:25,col:'#c87a8a',armor:30,pen:999,flame:true,toxic:true,
+    dmg:8,reload:3,shell:9,rng:300,sz:25,col:'#c87a8a',armor:30,pen:999,flame:true,toxic:true,art:'meat',
     arm:'spits WHITE TOXIC SLIME — close range, ignores armor, victims dissolve at 10 dmg/sec',
     desc:'The Meat — a grotesque tank that vomits a stream of white toxic liquid. The slime ignores armor and eats through anything caught in it, dealing 10 damage per second until it wears off.',ico:'the meat fleshy toxic tank'},
   // ===== 12 more units =====
@@ -778,7 +778,53 @@ function spawnTeam(team){
 }
 
 // ================= SPRITES (drawn, rotated, detailed) =================
+// THE MEAT — a grotesque living tank: a lumpy fleshy mass on bone-white rib treads
+function drawMeatHull(g,s,team){
+  const z=s.sz/24, col=s.col, dark=shade(col,-34), lite=shade(col,28);
+  g.save();g.globalAlpha=.30;g.fillStyle='#000';g.beginPath();g.ellipse(3*z,4*z,15*z,12*z,0,0,TAU);g.fill();g.restore();
+  // bone-white rib treads
+  for(const yy of [-12*z,7*z]){
+    g.fillStyle='#cfc4b0';rr(g,-13*z,yy,26*z,5*z,2.5*z);g.fill();
+    g.fillStyle='#8a8270';for(let i=-12;i<13;i+=2.4)g.fillRect(i*z,yy,1.1*z,5*z);
+  }
+  // fleshy lumpy body
+  g.fillStyle=vgrad(g,0,-8*z,0,8*z,lite,dark);
+  g.beginPath();g.moveTo(-12*z,-6*z);
+  g.quadraticCurveTo(-15*z,0,-12*z,6*z);g.quadraticCurveTo(0,9*z,12*z,6*z);
+  g.quadraticCurveTo(15*z,0,12*z,-6*z);g.quadraticCurveTo(0,-9*z,-12*z,-6*z);
+  g.closePath();g.fill();
+  // dark veiny wounds + glistening highlight
+  g.fillStyle='rgba(120,30,50,.5)';
+  g.beginPath();g.ellipse(-4*z,-2*z,3.5*z,2.2*z,0.3,0,TAU);g.fill();
+  g.beginPath();g.ellipse(5*z,3*z,2.8*z,1.8*z,-0.4,0,TAU);g.fill();
+  g.fillStyle='rgba(255,220,225,.35)';g.beginPath();g.ellipse(-3*z,-3*z,5*z,2.5*z,0.2,0,TAU);g.fill();
+  g.strokeStyle='rgba(90,20,40,.5)';g.lineWidth=Math.max(1,z*.5);
+  g.beginPath();g.moveTo(-9*z,1*z);g.lineTo(-2*z,-3*z);g.lineTo(4*z,1*z);g.lineTo(10*z,-2*z);g.stroke();
+  roundel(g,team,-8*z,0,1.8*z);
+}
+function drawMeatTurret(g,s,team,recoil){
+  const z=s.sz/24, col=shade(s.col,12), dark=shade(s.col,-30);
+  g.save();g.translate(-recoil*0.5,0);
+  // fleshy turret mound
+  g.fillStyle=vgrad(g,0,-5*z,0,5*z,shade(col,20),dark);
+  g.beginPath();g.ellipse(0,0,7*z,6*z,0,0,TAU);g.fill();
+  // throat → maw spitter pointing forward (+x)
+  g.fillStyle=dark;rr(g,4*z,-2*z,8*z,4*z,1.5*z);g.fill();
+  g.fillStyle='#2a0a14';g.beginPath();g.arc(13*z,0,3*z,0,TAU);g.fill();
+  g.fillStyle='#9fd98f';g.beginPath();g.arc(13*z,0,1.4*z,0,TAU);g.fill();   // glowing toxic gullet
+  // teeth ring around the maw
+  g.fillStyle='#e8e0d0';
+  for(let a=0;a<TAU;a+=TAU/8){ g.beginPath();
+    g.moveTo(13*z+Math.cos(a)*3*z,Math.sin(a)*3*z);
+    g.lineTo(13*z+Math.cos(a)*2*z,Math.sin(a)*2*z);
+    g.lineTo(13*z+Math.cos(a+0.35)*2.7*z,Math.sin(a+0.35)*2.7*z);g.closePath();g.fill(); }
+  // a single watching eye on the mound
+  g.fillStyle='#fff';g.beginPath();g.arc(-1*z,-2*z,1.7*z,0,TAU);g.fill();
+  g.fillStyle='#000';g.beginPath();g.arc(-0.5*z,-2*z,0.8*z,0,TAU);g.fill();
+  g.restore();
+}
 function drawTank(g,s,team,recoil){
+  if(s.art==='meat')return drawMeatHull(g,s,team);
   if(s.art==='m41')return drawM41Hull(g,s,team);
   if(s.art==='m60')return drawM60Hull(g,s,team);
   if(s.art==='tiger2')return drawTiger2Hull(g,s,team);
@@ -1703,6 +1749,7 @@ function drawM41Turret(g,s,team,recoil){
 }
 function drawTurret(g,s,team,recoil){
   const z=s.sz/24, col=shade(s.col,10), dark=shade(s.col,-30), hi=shade(s.col,60);
+  if(s.art==='meat')return drawMeatTurret(g,s,team,recoil);
   if(s.art==='m41')return drawM41Turret(g,s,team,recoil);
   if(s.art==='m60')return drawM60Turret(g,s,team,recoil);
   if(s.art==='tiger2')return drawTiger2Turret(g,s,team,recoil);
