@@ -811,7 +811,7 @@ function drawMeatTurret(g,s,team,recoil){
   // throat → maw spitter pointing forward (+x)
   g.fillStyle=dark;rr(g,4*z,-2*z,8*z,4*z,1.5*z);g.fill();
   g.fillStyle='#2a0a14';g.beginPath();g.arc(13*z,0,3*z,0,TAU);g.fill();
-  g.fillStyle='#9fd98f';g.beginPath();g.arc(13*z,0,1.4*z,0,TAU);g.fill();   // glowing toxic gullet
+  g.fillStyle='#f3ecd2';g.beginPath();g.arc(13*z,0,1.4*z,0,TAU);g.fill();   // creamy mayo gullet
   // teeth ring around the maw
   g.fillStyle='#e8e0d0';
   for(let a=0;a<TAU;a+=TAU/8){ g.beginPath();
@@ -3480,7 +3480,7 @@ function moveEnt(e){
   if(e.poisonT>0){ e.poisonT--;
     if(gtime%6===0)hit(e,1,e.poisonOwner||null);
     if(Math.random()<0.3)parts.push({x:e.x+(Math.random()-.5)*s.sz,y:e.y+(Math.random()-.5)*s.sz,
-      vx:0,vy:-0.3,t:0,life:14,r:2+Math.random()*2,c:Math.random()<.5?'#dffbd0':'#9fd98f'});
+      vx:0,vy:-0.3,t:0,life:14,r:2+Math.random()*2,c:Math.random()<.5?'#fdfdf0':'#f3ecd2'});
   }
   // smoke dischargers: thick cloud hides the tank from guidance systems
   if(e.smokeT>0){ e.smokeT--;
@@ -5446,9 +5446,22 @@ function drawParts(){
 }
 function drawShells(){
   for(const sh of shells){const sx=sh.x-cam.x,sy=sh.y-cam.y;
-    if(sh.flame){ // gout of fire (or toxic slime)
+    if(sh.flame&&sh.toxic){ // a splatter of mayo — lumpy white-cream globs, not clean circles
+      ctx.globalAlpha=0.95;
+      ctx.fillStyle=['#fdfdf0','#f3ecd2','#e9e0bf'][Math.random()*3|0];
+      ctx.beginPath();                         // irregular blob outline
+      const N=7, br=2.4+Math.random()*2.4;
+      for(let i=0;i<=N;i++){ const a=i/N*TAU, rr=br*(0.55+Math.random()*0.8);
+        const px=sx+Math.cos(a)*rr, py=sy+Math.sin(a)*rr; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+      ctx.closePath();ctx.fill();
+      ctx.fillStyle='rgba(255,255,250,.7)';     // glossy sheen
+      ctx.beginPath();ctx.arc(sx-br*0.3,sy-br*0.3,br*0.35,0,TAU);ctx.fill();
+      ctx.fillStyle='#fffef5';                  // flung droplets
+      for(let i=0;i<3;i++){ ctx.beginPath();ctx.arc(sx+(Math.random()-.5)*11,sy+(Math.random()-.5)*11,0.7+Math.random(),0,TAU);ctx.fill(); }
+      ctx.globalAlpha=1;
+    } else if(sh.flame){ // gout of fire
       ctx.globalAlpha=0.85;
-      ctx.fillStyle=sh.toxic?['#eaffea','#bfe8b0','#8fd98f'][Math.random()*3|0]:['#ffd24a','#ff9a2a','#f4502a'][Math.random()*3|0];
+      ctx.fillStyle=['#ffd24a','#ff9a2a','#f4502a'][Math.random()*3|0];
       ctx.beginPath();ctx.arc(sx+(Math.random()-.5)*3,sy+(Math.random()-.5)*3,3+Math.random()*3.5,0,TAU);ctx.fill();
       ctx.globalAlpha=1;
     } else if(sh.rocket){ // rocket with a smoky orange trail
