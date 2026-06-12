@@ -4184,26 +4184,27 @@ function updateEchoes(){
 
 // ── N: Time Stop ── the world holds its breath. Every other unit AND every enemy bullet freezes
 // solid for ~3s; only you keep moving and firing. (THE WORLD.)
-let timeStopT=0, timeStopBy=null;
-function timeStop(p){
-  if((p.tstopCd||0)>0){flash('⏱ TIME-STOP RECHARGING… '+Math.ceil(p.tstopCd/60)+'s');return;}
-  p.tstopCd=900; timeStopT=200; timeStopBy=p;
-  flash('⏱⏱⏱ TIME STOP — the world holds its breath. only you move.');
+let timeStopped=false, timeStopBy=null;
+function timeStop(p){                              // a free toggle: press N to stop, N again to resume
+  if(timeStopped){ timeStopped=false; timeStopBy=null; flash('▶ TIME RESUMES.'); return; }
+  timeStopped=true; timeStopBy=p;
+  flash('⏱⏱⏱ TIME STOP — the world holds its breath. press N again to resume.');
   shake=Math.min(60,shake+12);
 }
 function updateTimeStop(){
-  if(timeStopT<=0)return; timeStopT--;
+  if(!timeStopped)return;
   const me=timeStopBy, mt=me&&me.team;
+  if(!me||me.dead){ timeStopped=false; return; }   // if the wielder is gone, time resumes
   for(const e of ents){ if(e.dead||e===me)continue; e.stunT=Math.max(e.stunT||0,3); e.vx=0;e.vy=0;e.spd=0; }
   for(const sh of shells){ if(sh.team===mt)continue; sh.vx=0;sh.vy=0; }
   for(const m of missiles){ if(m.team===mt)continue; m.vx=0;m.vy=0; }
 }
 function drawTimeStopOverlay(){
-  if(timeStopT<=0)return; const fade=Math.min(1,timeStopT/30);
+  if(!timeStopped)return;
   ctx.save();
-  ctx.globalAlpha=0.10*fade;ctx.fillStyle='#b0c0e0';ctx.fillRect(0,0,W,H);
+  ctx.globalAlpha=0.10;ctx.fillStyle='#b0c0e0';ctx.fillRect(0,0,W,H);
   ctx.globalAlpha=0.9;ctx.fillStyle='#e8eeff';ctx.textAlign='center';
-  ctx.font='bold 26px ui-monospace,monospace';ctx.fillText('⏱ TIME STOPPED',W/2,H-46);
+  ctx.font='bold 26px ui-monospace,monospace';ctx.fillText('⏱ TIME STOPPED — N to resume',W/2,H-46);
   ctx.restore();
 }
 // ── F: Entropy Field ── a zone where time races forward: enemies inside AGE — taking damage that
@@ -5563,7 +5564,7 @@ function update(){
       +(player.spec.echofork?`<br><span style="color:#caf">⧉ V: echo fork${(player.echoCd||0)>0?' ('+Math.ceil(player.echoCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.quicken?`<br><span style="color:#cbb6ff">⏩ X: time-skip${(player.skipT||0)>0?' ACTIVE':((player.skipCd||0)>0?' ('+Math.ceil(player.skipCd/60)+'s)':' READY')}</span>`:'')
       +(player.spec.foresight?`<br><span style="color:#9df">👁 G: foresight${(player.foreT||0)>0?' ACTIVE':((player.foreCd||0)>0?' ('+Math.ceil(player.foreCd/60)+'s)':' READY')}</span>`:'')
-      +(player.spec.timestop?`<br><span style="color:#e8eeff">⏱ N: time stop${timeStopT>0?' ACTIVE':((player.tstopCd||0)>0?' ('+Math.ceil(player.tstopCd/60)+'s)':' READY')}</span>`:'')
+      +(player.spec.timestop?`<br><span style="color:#e8eeff">⏱ N: time stop${timeStopped?' ⏸ ON (N=resume)':' (N=freeze)'}</span>`:'')
       +(player.spec.entropy?`<br><span style="color:#caf">⌗ F: entropy field${(player.entCd||0)>0?' ('+Math.ceil(player.entCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.kinetic?`<br><span style="color:#7fd9ff">🛰 X: rods from God${rodCd>0?' ('+Math.ceil(rodCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.cls==='plane'?`<br><span style="color:#fc6">🔥 C: flares${(player.flareCd||0)>0?' ('+Math.ceil(player.flareCd/60)+'s)':' READY'}</span>`:'')
@@ -5849,7 +5850,7 @@ function startGame(key){
   document.getElementById('start').style.display='none';
   ents=[];shells=[];parts=[];bombs=[];nukes=[];floaters=[];missiles=[];artCd=0;nukeFlash=0;
   carrierStrikeCd=0;empCd=0;hpassCd=0;swarmCd=0;rodCd=0;ionCd=0;shieldCd=0;lanceCd=0;meteorStormCd=0;fimbulCd=0;fimbulT=0;enderCd=0;enderFlash=0;meteorBarrage=null;ionBeams.length=0;meteors.length=0;
-  sonicRings.length=0;blackHoles.length=0;rods.length=0;bolts.length=0;stormZones.length=0;stasisFields.length=0;entropyZones.length=0;timeStopT=0;
+  sonicRings.length=0;blackHoles.length=0;rods.length=0;bolts.length=0;stormZones.length=0;stasisFields.length=0;entropyZones.length=0;timeStopped=false;
   SCORE.blue=0;SCORE.red=0;SCORE.over=false;myKills=0;
   genCPs();
   wrecks=[];decals=[];
