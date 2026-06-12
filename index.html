@@ -648,6 +648,12 @@ const VEH={
     missile:'ANY',misscd:100,antisub:true,swarmLaunch:true,art:'plumeria',secret:true,
     arm:'CLASSIFIED BEYOND TOP SECRET · adaptive-stealth · F: SWARM LAUNCH (10 simultaneous missiles)',
     desc:'LINK PLUMERIA. No public records. Special: F = Swarm Launch — releases 10 homing missiles simultaneously at all nearby enemies. Crash-proof.',ico:'link plumeria black project'},
+  // a B-2 that fights — doubled airframe, defensive auto-turrets, fast missiles
+  fakefighter:{name:'Fake Fighter',cls:'plane',hp:400,acc:0.12,maxs:17.2,mins:6.8,turn:0.07,
+    dmg:80,reload:3,shell:22,rng:840,sz:34,col:'#23272f',armor:0,pen:200,stealth:true,notarget:true,nocrash:true,
+    missile:'ANY',misscd:120,turrets:4,art:'b2',secret:true,
+    arm:'CLASSIFIED · looks like a B-2, fights like nothing else · 4 auto-turrets shred nearby foes · 2s missiles (R) · cannon (click)',
+    desc:'FAKE FIGHTER. A B-2 Spirit with the safety off — every stat doubled, four self-aiming defensive turrets that gun down anything close, and a 2-second missile reload. Crash-proof, radar-invisible.',ico:'fake fighter b2'},
   // ===== DEEP VAULT — second tier, hidden behind a far harder intercept =====
   tempest:{name:'[SEALED]',cls:'plane',hp:400000,acc:0.2,maxs:21.0,mins:4.0,turn:0.14,
     dmg:120,reload:1.5,shell:30,rng:1100,sz:24,col:'#1a2030',armor:0,pen:9999,stealth:true,notarget:true,nocrash:true,
@@ -2663,6 +2669,7 @@ function drawPlane(g,s,team,fold){
     case 'tempest':return drawTempest(g,s,team,z);
     case 'aegis':return drawAegis(g,s,team,z);
     case 'ragnarok':return drawRagnarok(g,s,team,z);
+    case 'b2':return drawB2(g,s,team,z);
   }
   if(s.bombs){ drawB2(g,s,team,z); return; }   // bomber = stealth flying wing
   if(s.a10){ drawA10(g,s,team,z); return; }
@@ -3508,6 +3515,25 @@ function fireGun(p,a){
     life:s.rng/s.shell,big:false,owner:p,
     target:pickShellTarget(p,p.x,p.y,a,p.team,air), turn:p===player?0.10:0.05});
   if(Math.random()<0.5)sfxFire(false,p.x,p.y);
+}
+// defensive auto-turrets: each frame, lock the nearest enemy and spray homing rounds (no input needed —
+// works for the player, AI and remote multiplayer pilots alike)
+function turretTick(e){
+  if(e.dead||!e.spec.turrets)return;
+  e.turCd=(e.turCd||0)-1; if(e.turCd>0)return;
+  let best=null,bd=e.spec.rng*1.25;
+  for(const o of ents){ if(o.dead||o.team===e.team)continue;
+    const d=Math.hypot(o.x-e.x,o.y-e.y); if(d<bd){bd=d;best=o;} }
+  if(!best)return;
+  e.turCd=15;                                  // a burst every ~0.25s
+  const base=Math.atan2(best.y-e.y,best.x-e.x);
+  for(let i=0;i<e.spec.turrets;i++){ const a=base+(Math.random()-.5)*0.12;
+    shells.push({x:e.x+Math.cos(a)*e.spec.sz,y:e.y+Math.sin(a)*e.spec.sz,
+      vx:Math.cos(a)*e.spec.shell,vy:Math.sin(a)*e.spec.shell,
+      dmg:e.spec.dmg*0.5,pen:e.spec.pen,team:e.team,air:true,
+      lifeMax:e.spec.rng/e.spec.shell,life:e.spec.rng/e.spec.shell,big:false,owner:e,
+      target:best,turn:0.09}); }
+  if(Math.random()<0.3)sfxFire(false,e.x,e.y);
 }
 function dropBomb(p){
   if(p.bombcd>0)return;
@@ -5140,7 +5166,7 @@ function update(){
       if(distSeg(o.x,o.y,ax,ay,bx,by)<o.r){trees.splice(i,1);boom(o.x,o.y,6,'#f84');}}
     if(gtime%10===0)sfxFire(false,player.x,player.y);
   }
-  for(const e of ents){ if(e.dead)continue; if(e.ai&&e!==player)aiThink(e); moveEnt(e); }
+  for(const e of ents){ if(e.dead)continue; if(e.ai&&e!==player)aiThink(e); moveEnt(e); turretTick(e); }
   collideCrashes();
   // recon radio net: spotter units paint nearby stealth/concealed enemies for their whole team
   if(gtime%15===0)for(const sp of ents){ if(sp.dead||!sp.spec.spotter)continue;
