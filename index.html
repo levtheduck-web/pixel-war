@@ -4161,13 +4161,17 @@ function recordTimeline(){
       a:+ent.ang.toFixed(2),hp:Math.round(ent.hp),mh:ent.maxhp,d:ent.dead?1:0,
       ai:ent.ai?1:0,rm:ent.remote?1:0,ip:(ent===player)?1:0,
       md:[ent.mods.engine|0,ent.mods.gun|0,ent.mods.tracks|0]}; });
-  timeline.push({sc:[SCORE.blue,SCORE.red],e});
+  timeline.push({sc:[SCORE.blue,SCORE.red],mk:myKills,e});
   if(timeline.length>1800)timeline.shift();                  // cap memory (~2 min of history)
 }
 function applyTimeline(snap){
   if(!snap)return;
   SCORE.blue=snap.sc[0]; SCORE.red=snap.sc[1];
+  if(snap.mk!=null)myKills=snap.mk;                                  // rewind your kill count too
   if(SCORE.blue<SCORE.goal&&SCORE.red<SCORE.goal)SCORE.over=false;   // un-end the match
+  // refresh the scoreboard immediately so it visibly counts backwards
+  const _b=document.getElementById('bscore'),_r=document.getElementById('rscore'),_k=document.getElementById('kills');
+  if(_b)_b.textContent=SCORE.blue; if(_r)_r.textContent=SCORE.red; if(_k)_k.textContent=myKills;
   const byId={}; for(const e of ents)byId[e.tid]=e;
   const keep=new Set();
   for(const o of snap.e){ keep.add(o.id);
