@@ -5502,7 +5502,7 @@ function update(){
       if(distSeg(o.x,o.y,ax,ay,bx,by)<o.r){trees.splice(i,1);boom(o.x,o.y,6,'#f84');}}
     if(gtime%10===0)sfxFire(false,player.x,player.y);
   }
-  for(const e of ents){ if(e.dead)continue; if(e.ai&&e!==player)aiThink(e); moveEnt(e); turretTick(e); recordHistory(e); }
+  for(const e of ents){ if(e.dead)continue; if(e.ai&&e!==player)aiThink(e); moveEnt(e); turretTick(e); recordHistory(e); if(e.spec.tempest)tempestTick(e); }
   recordTimeline();   // PARADOX: snapshot the whole battlefield for Rewind
   collideCrashes();
   // recon radio net: spotter units paint nearby stealth/concealed enemies for their whole team
@@ -5512,7 +5512,7 @@ function update(){
       if(Math.hypot(o.x-sp.x,o.y-sp.y)<(sp.spec.spotR||420)){
         if(!(o.spottedT>0))floatText(o.x,o.y-o.spec.sz-10,'⚠ SPOTTED','#fc6');
         o.spottedT=75; } } }
-  tempestTick(player);
+  // (tempestTick now runs per-entity in the loop above, so remote tempest/ragnarok pilots work too)
   updateShells();updateBombs();updateNukes();updateMissiles();updateParts();updateFloaters();updateCPs();updateWrecks();updateSonicRings();updateBlackHoles();updateRods();updateBases();updateBolts();updateStormZones();
   try{ updateIonBeams();updateShieldDome();updateLance();updateMeteors();updateFimbul();updateEnder();
        updateFate();updateStasis();updateEchoes();updateTimeStop();updateEntropy(); }
@@ -5869,7 +5869,7 @@ function startGame(key){
   document.getElementById('start').style.display='none';
   ents=[];shells=[];parts=[];bombs=[];nukes=[];floaters=[];missiles=[];artCd=0;nukeFlash=0;
   carrierStrikeCd=0;empCd=0;hpassCd=0;swarmCd=0;rodCd=0;ionCd=0;shieldCd=0;lanceCd=0;meteorStormCd=0;fimbulCd=0;fimbulT=0;enderCd=0;enderFlash=0;meteorBarrage=null;ionBeams.length=0;meteors.length=0;
-  sonicRings.length=0;blackHoles.length=0;rods.length=0;bolts.length=0;stormZones.length=0;stasisFields.length=0;entropyZones.length=0;timeStopped=false;
+  sonicRings.length=0;blackHoles.length=0;rods.length=0;bolts.length=0;stormZones.length=0;stasisFields.length=0;entropyZones.length=0;timeStopped=false;timeStopBy=null;rewinding=false;timeline.length=0;
   SCORE.blue=0;SCORE.red=0;SCORE.over=false;myKills=0;
   genCPs();
   wrecks=[];decals=[];
@@ -5893,6 +5893,7 @@ function startGame(key){
 function showRespawn(){
   if(SCORE.over)return;
   paused=false; // game keeps running
+  if(timeStopBy===player){ timeStopped=false; timeStopBy=null; }   // never leave time frozen after you die
   const idx=ents.indexOf(player);if(idx>=0)ents.splice(idx,1);
   document.getElementById('respawn').style.display='flex';
   buildCards('picker2',key=>{
