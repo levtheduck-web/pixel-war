@@ -672,6 +672,12 @@ const VEH={
     missile:'ANY',misscd:0,tempest:true,nuke:true,meteorStorm:true,fimbul:true,worldEnder:true,art:'ragnarok',secret:true,tier4:true,
     arm:'VAULT IV · THE END OF ALL THINGS · 15 storm-powers (1–15) · B: Surtr\'s meteor storm · Z: Fimbulwinter · V: WORLD-ENDER · N: nuke',
     desc:'[SEALED]',ico:'apocalypse machine'},
+  // ===== VAULT V — the impossible craft, a knot in time =====
+  paradox:{name:'[SEALED]',cls:'plane',hp:800000,acc:0.24,maxs:22.0,mins:0,turn:0.2,
+    dmg:0,reload:99,shell:0,rng:1500,sz:24,col:'#1b1030',armor:0,pen:9999,stealth:true,notarget:true,nocrash:true,noGun:true,
+    missile:null,misscd:0,causality:true,rewind:true,stasis:true,echofork:true,art:'paradox',secret:true,tier5:true,
+    arm:'VAULT V · A KNOT IN TIME · CLICK: predestined death · Z: rewind your own timeline · B: stasis field · V: echo fork',
+    desc:'[SEALED]',ico:'paradox time craft'},
 };
 // global durability buff: every unit gets 50% more health
 for(const k in VEH) VEH[k].hp=Math.round(VEH[k].hp*1.5);
@@ -2329,6 +2335,28 @@ function drawRagnarok(g,s,team,z){
   g.fillStyle='rgba(255,90,80,.5)';g.beginPath();g.ellipse(-.4*z,-12*z,.6*z,1.4*z,0,0,TAU);g.fill();
   roundel(g,team,-13*z,9*z,1.4*z);roundel(g,team,13*z,9*z,1.4*z);
 }
+// PARADOX — a knot in time: the hull exists at three moments at once (two faint time-echoes flanking
+// the real delta), a clock-core sweeping at its heart. violet past, cyan future.
+function drawParadox(g,s,team,z){
+  pShadow(g,z,18,13);
+  for(const off of [-6,6]){ g.save(); g.globalAlpha=0.22; g.translate(0,off*z*0.45);
+    g.fillStyle=off<0?'#6cf':'#b89cff';
+    g.beginPath();g.moveTo(0,-18*z);g.lineTo(-12*z,10*z);g.lineTo(0,5*z);g.lineTo(12*z,10*z);g.closePath();g.fill();
+    g.restore(); }
+  const bg=g.createLinearGradient(0,-18*z,0,11*z);
+  bg.addColorStop(0,'#8a6cff');bg.addColorStop(.5,s.col);bg.addColorStop(1,'#05030f');
+  g.fillStyle=bg;g.beginPath();
+  g.moveTo(0,-18*z);g.lineTo(-13*z,10*z);g.lineTo(0,5*z);g.lineTo(13*z,10*z);g.closePath();g.fill();
+  g.strokeStyle='rgba(150,220,255,.8)';g.lineWidth=Math.max(1,z*.9);g.shadowColor='#9cf';g.shadowBlur=6;
+  g.beginPath();g.moveTo(0,-18*z);g.lineTo(-13*z,10*z);g.moveTo(0,-18*z);g.lineTo(13*z,10*z);g.stroke();g.shadowBlur=0;
+  g.strokeStyle='rgba(200,180,255,.9)';g.lineWidth=Math.max(1,z*.6);
+  g.beginPath();g.arc(0,-3*z,3.4*z,0,TAU);g.stroke();
+  const ha=(gtime*0.05)%TAU;                              // the lone sweeping clock hand
+  g.strokeStyle='#fff';g.lineWidth=Math.max(1,z*.7);
+  g.beginPath();g.moveTo(0,-3*z);g.lineTo(Math.cos(ha-Math.PI/2)*3*z,-3*z+Math.sin(ha-Math.PI/2)*3*z);g.stroke();
+  g.fillStyle='rgba(190,160,255,.95)';g.beginPath();g.arc(0,-3*z,1.1*z,0,TAU);g.fill();
+  roundel(g,team,-9*z,8*z,1.3*z);roundel(g,team,9*z,8*z,1.3*z);
+}
 function pShadow(g,z,rx,ry){ g.save();g.globalAlpha=.18;g.fillStyle='#000';
   g.beginPath();g.ellipse(10,14,rx*z,ry*z,0,0,TAU);g.fill();g.restore(); }
 function roundel(g,team,x,y,r){ g.fillStyle=TEAM[team];g.beginPath();g.arc(x,y,r,0,TAU);g.fill(); }
@@ -2670,6 +2698,7 @@ function drawPlane(g,s,team,fold){
     case 'aegis':return drawAegis(g,s,team,z);
     case 'ragnarok':return drawRagnarok(g,s,team,z);
     case 'b2':return drawB2(g,s,team,z);
+    case 'paradox':return drawParadox(g,s,team,z);
   }
   if(s.bombs){ drawB2(g,s,team,z); return; }   // bomber = stealth flying wing
   if(s.a10){ drawA10(g,s,team,z); return; }
@@ -3141,6 +3170,9 @@ function handleKey(e){
   if(k==='z'&&player&&!player.dead&&player.spec.fimbul)fimbulwinter(player);
   if(k==='v'&&player&&!player.dead&&player.spec.orbitalLance)orbitalLance(player);
   if(k==='v'&&player&&!player.dead&&player.spec.worldEnder)worldEnder(player);
+  if(k==='z'&&player&&!player.dead&&player.spec.rewind)rewind(player);
+  if(k==='b'&&player&&!player.dead&&player.spec.stasis)stasisField(player);
+  if(k==='v'&&player&&!player.dead&&player.spec.echofork)echoFork(player);
   if(k==='c'&&player&&!player.dead&&player.spec.cls==='plane')popFlares(player);
   // TEMPEST storm-powers — Q cycles the selected power, a mouse CLICK fires it.
   // number row 1-9,0 + Shift+1..5 jump straight to a power (then click to use).
@@ -3232,6 +3264,8 @@ cv.addEventListener('mousedown',e=>{
   if(NET.mode==='client'){ NET.clickEdge=true; return; }   // client relays the click to the host
   // TEMPEST: a click unleashes the currently-selected storm-power (no gun)
   if(player&&!player.dead&&player.spec.tempest)fireAbility(player,player.absel||0);
+  // PARADOX: a click marks foes for predestined death
+  if(player&&!player.dead&&player.spec.causality)fireCausality(player);
 });
 addEventListener('mouseup',e=>{
   if(e.button!==0)return;
@@ -3984,6 +4018,115 @@ function updateEnder(){ if(enderCd>0)enderCd--; if(enderFlash>0)enderFlash--; }
 function drawEnderOverlay(){
   if(enderFlash<=0)return;
   ctx.save();ctx.globalAlpha=(enderFlash/55)*0.6;ctx.fillStyle='#ff3a10';ctx.fillRect(0,0,W,H);ctx.restore();
+}
+
+// ===================== VAULT V — PARADOX · four original time-mechanics =====================
+let stasisFields=[];
+
+// ── CLICK: Predestined Death ── mark every foe near the cursor; 1.5s later their end simply
+// happens — damage that bypasses shields/ghosting, because in this timeline they are already gone.
+function fireCausality(p){
+  if((p.causalCd||0)>0)return; p.causalCd=36;
+  const R=240,tx=mouse.wx,ty=mouse.wy; let n=0;
+  for(const e of ents){ if(e.dead||e.team===p.team)continue;
+    if(Math.hypot(e.x-tx,e.y-ty)<R){ e.fateT=Math.max(e.fateT||0,90); e.fateBy=p; n++; } }
+  for(let i=0;i<20;i++){const a=Math.random()*TAU;parts.push({x:tx,y:ty,vx:Math.cos(a)*2,vy:Math.sin(a)*2,t:0,life:18,r:2,c:'#b89cff'});}
+  if(n)flash('⌛ PREDESTINED — '+n+' marked. their end has already happened.');
+  blip(180,900,0.15,'sine',0.2,p.x,p.y);
+}
+function updateFate(){
+  for(const e of ents){ if(e.dead||!(e.fateT>0))continue; e.fateT--;
+    if(e.fateT===0){ const og=e.ghostT; e.ghostT=0; hit(e,4000,e.fateBy||e); e.ghostT=og; boom(e.x,e.y,30,'#b89cff');
+      for(let i=0;i<24;i++){const a=Math.random()*TAU,sp=Math.random()*4+1;
+        parts.push({x:e.x,y:e.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:0,life:22,r:2+Math.random()*3,c:Math.random()<.5?'#b89cff':'#fff'});} } }
+}
+function drawFate(){
+  for(const e of ents){ if(e.dead||!(e.fateT>0))continue;
+    const sx=e.x-cam.x, sy=e.y-cam.y-e.spec.sz-8, frac=e.fateT/90;
+    ctx.save();
+    ctx.globalAlpha=0.45;ctx.strokeStyle='#b89cff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(sx,sy,9,0,TAU);ctx.stroke();
+    ctx.globalAlpha=0.95;ctx.beginPath();ctx.arc(sx,sy,9,-Math.PI/2,-Math.PI/2+TAU*(1-frac));ctx.stroke();
+    ctx.restore(); }
+}
+
+// ── Z: Rewind ── snap your own craft back ~2.6s through its recorded timeline, restoring that
+// past position AND the health you had then. damage you just took? it never happened.
+function recordHistory(p){
+  if(!p||!p.spec.rewind)return;
+  if((p.rewindCd||0)>0)p.rewindCd--;
+  p.hist=p.hist||[]; if(p.dead)return;
+  p.hist.push({x:p.x,y:p.y,ang:p.ang,hp:p.hp,spd:p.spd}); if(p.hist.length>160)p.hist.shift();
+}
+function rewind(p){
+  if((p.rewindCd||0)>0){flash('⌛ REWIND RECHARGING… '+Math.ceil(p.rewindCd/60)+'s');return;}
+  if(!p.hist||p.hist.length<12){flash('⌛ not enough timeline recorded yet');return;}
+  p.rewindCd=300; const s=p.hist[0];
+  for(const h of p.hist)if(Math.random()<0.3)parts.push({x:h.x,y:h.y,vx:0,vy:0,t:0,life:16,r:3,c:'#9cf'});
+  p.x=s.x;p.y=s.y;p.ang=s.ang;p.spd=s.spd; p.hp=Math.max(p.hp,s.hp);
+  p.vx=Math.cos(p.ang)*p.spd; p.vy=Math.sin(p.ang)*p.spd; p.hist.length=0;
+  flash('⌛⌛⌛ REWIND — that damage never happened.'); shake=Math.min(60,shake+10);
+}
+
+// ── B: Stasis Field ── a bubble where time stops: enemies freeze mid-air and so do their bullets.
+// when the field lifts, every frozen round flies back the way it came — at the people who fired it.
+function stasisField(p){
+  if((p.stasisCd||0)>0){flash('⏸ STASIS RECHARGING… '+Math.ceil(p.stasisCd/60)+'s');return;}
+  p.stasisCd=480;
+  stasisFields.push({x:mouse.wx,y:mouse.wy,r:300,t:0,life:240,team:p.team,owner:p,shots:[]});
+  flash('⏸⏸⏸ STASIS FIELD — time stops inside. their bullets are waiting.');
+}
+function updateStasis(){
+  for(const f of stasisFields){ f.t++;
+    const inside=(x,y)=>Math.hypot(x-f.x,y-f.y)<f.r;
+    if(f.t<f.life){
+      for(const e of ents){ if(e.dead||e.team===f.team)continue;
+        if(inside(e.x,e.y)){ e.stunT=Math.max(e.stunT||0,3); e.vx=0;e.vy=0;e.spd=0; } }
+      for(const sh of shells){ if(sh.team===f.team||sh.frozen)continue;
+        if(inside(sh.x,sh.y)){ sh.frozen=true; sh.fvx=sh.vx;sh.fvy=sh.vy; sh.vx=0;sh.vy=0; f.shots.push(sh); } }
+      for(const m of missiles){ if(m.team===f.team||m.frozen)continue;
+        if(inside(m.x,m.y)){ m.frozen=true; m.fvx=m.vx;m.fvy=m.vy; m.vx=0;m.vy=0; f.shots.push(m); } }
+      for(const sh of f.shots){ if(!sh.dead){sh.vx=0;sh.vy=0;} }
+    } else {
+      for(const sh of f.shots){ if(sh.dead)continue; sh.frozen=false; sh.team=f.team; sh.target=null;
+        sh.vx=-(sh.fvx||0); sh.vy=-(sh.fvy||0); if(sh.ang!=null)sh.ang+=Math.PI; }
+      f.done=true; flash('⏸ STASIS RELEASED — the bullets remember who fired them.');
+    } }
+  for(let i=stasisFields.length-1;i>=0;i--)if(stasisFields[i].done||stasisFields[i].t>stasisFields[i].life+2)stasisFields.splice(i,1);
+}
+function drawStasis(){
+  for(const f of stasisFields){ const sx=f.x-cam.x, sy=f.y-cam.y, pulse=0.5+0.5*Math.sin(f.t*0.1);
+    ctx.save();
+    ctx.globalAlpha=0.12;ctx.fillStyle='#7fd9ff';ctx.beginPath();ctx.arc(sx,sy,f.r,0,TAU);ctx.fill();
+    ctx.globalAlpha=0.6;ctx.strokeStyle='rgba(160,220,255,'+pulse+')';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.arc(sx,sy,f.r,0,TAU);ctx.stroke();
+    ctx.globalAlpha=0.4;ctx.strokeStyle='#cfeeff';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx+Math.cos(f.t*0.02)*f.r*0.5,sy+Math.sin(f.t*0.02)*f.r*0.5);ctx.stroke();
+    ctx.restore(); }
+}
+
+// ── V: Echo Fork ── you split into three time-echoes of yourself. They fly off hunting, marking
+// foes with predestination, then collapse back out of existence. Only one of you was ever real.
+function echoFork(p){
+  if((p.echoCd||0)>0){flash('⧉ ECHO FORK RECHARGING… '+Math.ceil(p.echoCd/60)+'s');return;}
+  p.echoCd=600;
+  for(let i=0;i<3;i++){ const a=p.ang+(i-1)*0.6;
+    const e=makeVeh(p.key,p.team,p.x+Math.cos(a)*40,p.y+Math.sin(a)*40);
+    e.ai=true; e.echo=true; e.echoT=360; e.noRespawn=true; e.netId=++NET.idc;
+    e.maxhp=40000; e.hp=40000; e.ang=a;
+    ents.push(e);
+    for(let j=0;j<16;j++)parts.push({x:e.x,y:e.y,vx:(Math.random()-.5)*3,vy:(Math.random()-.5)*3,t:0,life:18,r:2,c:'#9cf'});
+  }
+  flash('⧉⧉⧉ ECHO FORK — three of you, and only one is real.');
+}
+function updateEchoes(){
+  for(const e of ents){ if(!e.echo||e.dead)continue; e.echoT--;
+    if(e.echoT<=0){ e.dead=true; boom(e.x,e.y,12,'#9cf'); continue; }
+    e.echoFire=(e.echoFire||0)-1;
+    if(e.echoFire<=0){ let best=null,bd=900;
+      for(const o of ents){ if(o.dead||o.team===e.team)continue; const d=Math.hypot(o.x-e.x,o.y-e.y); if(d<bd){bd=d;best=o;} }
+      if(best){ e.echoFire=42; best.fateT=Math.max(best.fateT||0,90); best.fateBy=e;
+        for(let i=0;i<6;i++){const a=Math.random()*TAU;parts.push({x:best.x,y:best.y,vx:Math.cos(a)*2,vy:Math.sin(a)*2,t:0,life:14,r:2,c:'#b89cff'});} } }
+  }
 }
 
 // ========================= TEMPEST — living warstorm · 15 storm-powers =========================
@@ -5166,7 +5309,7 @@ function update(){
       if(distSeg(o.x,o.y,ax,ay,bx,by)<o.r){trees.splice(i,1);boom(o.x,o.y,6,'#f84');}}
     if(gtime%10===0)sfxFire(false,player.x,player.y);
   }
-  for(const e of ents){ if(e.dead)continue; if(e.ai&&e!==player)aiThink(e); moveEnt(e); turretTick(e); }
+  for(const e of ents){ if(e.dead)continue; if(e.ai&&e!==player)aiThink(e); moveEnt(e); turretTick(e); recordHistory(e); }
   collideCrashes();
   // recon radio net: spotter units paint nearby stealth/concealed enemies for their whole team
   if(gtime%15===0)for(const sp of ents){ if(sp.dead||!sp.spec.spotter)continue;
@@ -5177,7 +5320,8 @@ function update(){
         o.spottedT=75; } } }
   tempestTick(player);
   updateShells();updateBombs();updateNukes();updateMissiles();updateParts();updateFloaters();updateCPs();updateWrecks();updateSonicRings();updateBlackHoles();updateRods();updateBases();updateBolts();updateStormZones();
-  try{ updateIonBeams();updateShieldDome();updateLance();updateMeteors();updateFimbul();updateEnder(); }
+  try{ updateIonBeams();updateShieldDome();updateLance();updateMeteors();updateFimbul();updateEnder();
+       updateFate();updateStasis();updateEchoes(); }
   catch(err){ showErr('⚠ vault-power update: '+err.message); }
   // carriers catapult escort jets into the fight (max 2 aloft per carrier)
   if(gtime%720===300)for(const c of ents){
@@ -5238,6 +5382,10 @@ function update(){
       +(player.spec.meteorStorm?`<br><span style="color:#ff7a3a">☄ B: Surtr's meteor storm${meteorStormCd>0?' ('+Math.ceil(meteorStormCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.fimbul?`<br><span style="color:#bfe8ff">❄ Z: Fimbulwinter${fimbulCd>0?' ('+Math.ceil(fimbulCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.worldEnder?`<br><span style="color:#ff5a2a">🌋 V: WORLD-ENDER${enderCd>0?' ('+Math.ceil(enderCd/60)+'s)':' READY'}</span>`:'')
+      +(player.spec.causality?`<br><span style="color:#b89cff">⌛ CLICK: predestined death</span>`:'')
+      +(player.spec.rewind?`<br><span style="color:#9cf">↺ Z: rewind${(player.rewindCd||0)>0?' ('+Math.ceil(player.rewindCd/60)+'s)':' READY'}</span>`:'')
+      +(player.spec.stasis?`<br><span style="color:#7fd9ff">⏸ B: stasis field${(player.stasisCd||0)>0?' ('+Math.ceil(player.stasisCd/60)+'s)':' READY'}</span>`:'')
+      +(player.spec.echofork?`<br><span style="color:#caf">⧉ V: echo fork${(player.echoCd||0)>0?' ('+Math.ceil(player.echoCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.kinetic?`<br><span style="color:#7fd9ff">🛰 X: rods from God${rodCd>0?' ('+Math.ceil(rodCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.cls==='plane'?`<br><span style="color:#fc6">🔥 C: flares${(player.flareCd||0)>0?' ('+Math.ceil(player.flareCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.noGun?'<br><span style="color:#9cf">👻 STEALTH — no guns aboard</span>':'')
@@ -5290,7 +5438,7 @@ function render(){
   else shake=0;
   drawGround();drawDecals();drawWrecks();drawProps();drawCPs();
   drawBombs(); drawNukes(); drawSonicRings(); drawBlackHoles(); drawRods(); drawStormZones(); drawBolts();
-  drawShieldDome(); drawIonBeams(); drawMeteors(); drawLance();
+  drawShieldDome(); drawIonBeams(); drawMeteors(); drawLance(); drawStasis(); drawFate();
   drawActivePaths();
   // each entity draws inside its own try — one bad sprite reports itself instead of blacking the map
   const safeDraw=e=>{ const tf=ctx.getTransform();
@@ -5337,6 +5485,7 @@ function buildCards(containerId,onPick){
     if(s.tier2&&!SECRET.cleared2)continue;   // deep-vault unit hidden behind the second puzzle
     if(s.tier3&&!SECRET.cleared3)continue;   // vault III — third codeword
     if(s.tier4&&!SECRET.cleared4)continue;   // vault IV — the final codeword
+    if(s.tier5&&!SECRET.cleared5)continue;   // vault V — the impossible craft
     const card=document.createElement('div');card.className='card';
     const cvp=document.createElement('canvas');cvp.width=150;cvp.height=120;
     const g=cvp.getContext('2d');g.translate(75,60);g.scale(1.6,1.6);
@@ -5519,7 +5668,7 @@ function startGame(key){
   document.getElementById('start').style.display='none';
   ents=[];shells=[];parts=[];bombs=[];nukes=[];floaters=[];missiles=[];artCd=0;nukeFlash=0;
   carrierStrikeCd=0;empCd=0;hpassCd=0;swarmCd=0;rodCd=0;ionCd=0;shieldCd=0;lanceCd=0;meteorStormCd=0;fimbulCd=0;fimbulT=0;enderCd=0;enderFlash=0;meteorBarrage=null;ionBeams.length=0;meteors.length=0;
-  sonicRings.length=0;blackHoles.length=0;rods.length=0;bolts.length=0;stormZones.length=0;
+  sonicRings.length=0;blackHoles.length=0;rods.length=0;bolts.length=0;stormZones.length=0;stasisFields.length=0;
   SCORE.blue=0;SCORE.red=0;SCORE.over=false;myKills=0;
   genCPs();
   wrecks=[];decals=[];
@@ -5626,7 +5775,12 @@ function renderIntel(){
       if(SECRET.cleared3){
         h+='<br><span style="color:#9f9">VAULT III · the AEGIS is in the hangar.</span>';
         if(SECRET.cleared4){
-          h+='<br><span style="color:#f99">VAULT IV · RAGNAROK WALKS — nothing deeper remains.</span>';
+          h+='<br><span style="color:#9f9">VAULT IV · RAGNAROK walks.</span>';
+          if(SECRET.cleared5){
+            h+='<br><span style="color:#caf">VAULT V · the PARADOX exists. and always did.</span>';
+          }else{
+            h+='<br><span style="color:#cbb6ff">▒ VAULT V ▒ — '+VAULT5.hint+'</span>';
+          }
         }else{
           h+='<br><span style="color:#ffd98a">▒ VAULT IV ▒ — '+VAULT4.hint+'</span>';
         }
@@ -5658,7 +5812,7 @@ setInterval(()=>{if(intelOpen)renderIntel();},1000); // live signal-lock % while
 // clearance is EARNED, never given: hold capture points to tap enemy uplinks (press I for INTEL),
 // break the cipher, and type the four-letter callsign anywhere. re-locks on every reload.
 // the callsign is not stored here — only its hash; the sealed strings below decrypt with it as key.
-const SECRET={cleared:false,cleared2:false,cleared3:false,cleared4:false};
+const SECRET={cleared:false,cleared2:false,cleared3:false,cleared4:false,cleared5:false};
 const VAULT={h:3485839884,len:4,
   name:'LUNCU0sgMSUv',
   ico:'DUNCU0sAEQUP',
@@ -5683,6 +5837,11 @@ const VAULT4={h:3213146314,len:8,
   desc:'RAGNAROK — the end of all things. All 15 storm-powers (1–15) PLUS: B = Surtr\'s Meteor Storm (the sky rains fire across the whole map) · Z = Fimbulwinter (every enemy freezes solid and bleeds frost) · V = WORLD-ENDER (catastrophic damage to every enemy alive) · N = nuke. There is nothing deeper.',
   msg:'⛧⛧⛧ VAULT IV BREACHED — RAGNAROK WAKES. THE SKY IS YOURS.',
   hint:'the twilight of the gods — the doom that ends every world. eight letters of Norse fire. type it anywhere.'};
+const VAULT5={h:722173933,len:7,
+  name:'PARADOX',
+  desc:'PARADOX — a knot in time, not a machine. It carries no guns. CLICK = Predestined Death (mark foes; their end has already happened) · Z = Rewind (snap your own craft back through time, undoing the last 2.5s of damage & motion) · B = Stasis Field (freeze enemies AND their bullets in time; when it lifts, the bullets fly back) · V = Echo Fork (split into time-echoes of yourself that hunt for you). Crash-proof, unseeable.',
+  msg:'⌛⌛⌛ VAULT V BREACHED — PARADOX EXISTS NOW. AND ALWAYS DID.',
+  hint:'a thing that contradicts itself and is true anyway — a knot in time. seven letters. type it anywhere.'};
 let secretBuf='';
 addEventListener('keydown',e=>{
   if(e.key&&e.key.length===1){ secretBuf=(secretBuf+e.key.toLowerCase()).slice(-12);
@@ -5690,6 +5849,7 @@ addEventListener('keydown',e=>{
     const c2=secretBuf.slice(-VAULT2.len);  // tier-2 code (tmpst, 5)
     const c3=secretBuf.slice(-VAULT3.len);  // tier-3 code (aegis, 5)
     const c4=secretBuf.slice(-VAULT4.len);  // tier-4 code (ragnarok, 8)
+    const c5=secretBuf.slice(-VAULT5.len);  // tier-5 code (paradox, 7)
     if(!SECRET.cleared&&vhash(c1)===VAULT.h){
       SECRET.cleared=true;
       VEH.umbra.name=unveil(VAULT.name,c1);
@@ -5717,11 +5877,19 @@ addEventListener('keydown',e=>{
       buildCards('picker',startGame);
       renderIntel();
     }
-    // tier 4 opens only after tier 3 — the final unlock
+    // tier 4 opens only after tier 3
     else if(SECRET.cleared3&&!SECRET.cleared4&&vhash(c4)===VAULT4.h){
       SECRET.cleared4=true;
       VEH.ragnarok.name=VAULT4.name; VEH.ragnarok.desc=VAULT4.desc;
       flash(VAULT4.msg);
+      buildCards('picker',startGame);
+      renderIntel();
+    }
+    // tier 5 opens only after tier 4 — the impossible craft
+    else if(SECRET.cleared4&&!SECRET.cleared5&&vhash(c5)===VAULT5.h){
+      SECRET.cleared5=true;
+      VEH.paradox.name=VAULT5.name; VEH.paradox.desc=VAULT5.desc;
+      flash(VAULT5.msg);
       buildCards('picker',startGame);
       renderIntel();
     } }
@@ -5760,7 +5928,7 @@ function applyWorld(w){ trees=w.trees||[];rocks=w.rocks||[];lakes=w.lakes||[];ri
 // ---- snapshot serialize / apply ----
 const ENT_FIELDS=['x','y','ang','tang','hp','maxhp','dead','fold','foldTgt','depth','domeT','tmpstT',
   'veilT','shroudT','ovchT','ghostT','dug','flareT','smokeT','siegeT','slowT','stunT','jamT','flash',
-  'recoil','wob','spd','wsel','absel','hijackT','spottedT','lanceT','lanceA','dashT'];
+  'recoil','wob','spd','wsel','absel','hijackT','spottedT','lanceT','lanceA','dashT','fateT'];
 function serEnt(e){ if(!e.netId)e.netId=++NET.idc;
   const o={i:e.netId,k:e.key,t:e.team,nm:e.name||''};
   for(const f of ENT_FIELDS){ const v=e[f]; o[f]=(typeof v==='number')?+v.toFixed(2):v; }
@@ -5782,6 +5950,7 @@ function buildSnapshot(){
              ion:ionBeams.map(z=>({x:z.x,y:z.y,t:z.t,charge:z.charge,fired:z.fired})),
              met:meteors.map(z=>({x:z.x,y:z.y,t:z.t,fuse:z.fuse})),
              rod:rods.map(z=>({x:z.x,y:z.y,t:z.t,fuse:z.fuse})),
+             st:stasisFields.map(z=>({x:z.x,y:z.y,r:z.r,t:z.t})),
              fim:fimbulT, end:enderFlash };
   return {type:'snap',e,sh,ms,cp,sc:[SCORE.blue,SCORE.red,SCORE.goal],fx};
 }
@@ -5797,6 +5966,7 @@ function clientApplySnapshot(m){
   ionBeams.length=0;(m.fx.ion||[]).forEach(z=>ionBeams.push(z));
   meteors.length=0;(m.fx.met||[]).forEach(z=>meteors.push(z));
   rods.length=0;(m.fx.rod||[]).forEach(z=>rods.push(z));
+  stasisFields.length=0;(m.fx.st||[]).forEach(z=>stasisFields.push({x:z.x,y:z.y,r:z.r,t:z.t,life:1e9,shots:[]}));
   fimbulT=m.fx.fim||0; enderFlash=m.fx.end||0;
   player=ents.find(e=>e.netId===NET.myId)||player;
   const bs=document.getElementById('bscore'),rs=document.getElementById('rscore');
@@ -5865,6 +6035,7 @@ function netApplyRemotes(){
       controlPlayer(ent);
       if(inp.pressed&&inp.pressed.length){ for(const rk of inp.pressed)handleKey({key:rk,preventDefault(){}}); }
       if(inp.click&&ent.spec.tempest)fireAbility(ent,ent.absel||0);
+      if(inp.click&&ent.spec.causality)fireCausality(ent);
       if(ent.spec.laser&&inp.down)netLaser(ent);
     } finally {
       player=savedP;
