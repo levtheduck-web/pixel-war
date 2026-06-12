@@ -6117,14 +6117,9 @@ addEventListener('keydown',e=>{
     const c3=secretBuf.slice(-VAULT3.len);  // tier-3 code (aegis, 5)
     const c4=secretBuf.slice(-VAULT4.len);  // tier-4 code (ragnarok, 8)
     const c5=secretBuf.slice(-VAULT5.len);  // tier-5 code (paradox, 7)
-    // ★ SHORT CODES ★ — quick unlocks (typed on the menu): all/lev = everything, t1..t5 = up to that tier
-    if(!started){
-      let sc=0;
-      if(secretBuf.endsWith('all')||secretBuf.endsWith('lev'))sc=5;
-      else if(secretBuf.endsWith('t5'))sc=5; else if(secretBuf.endsWith('t4'))sc=4;
-      else if(secretBuf.endsWith('t3'))sc=3; else if(secretBuf.endsWith('t2'))sc=2; else if(secretBuf.endsWith('t1'))sc=1;
-      if(sc){ unlockTo(sc); flash('★ UNLOCKED — '+(sc===5?'every airframe':'tiers 1–'+sc)+' ★'); return; }
-    }
+    // ★ MEGA CODE ★ — unlocks every classified airframe at once
+    if(secretBuf.endsWith('levisthebestcoder')&&!SECRET.cleared5){ unlockTo(5);
+      flash('★★★ MEGA CODE — EVERY AIRFRAME UNLOCKED ★★★'); return; }
     if(!SECRET.cleared&&vhash(c1)===VAULT.h){
       SECRET.cleared=true;
       VEH.umbra.name=unveil(VAULT.name,c1);
@@ -6253,12 +6248,18 @@ function clientApplySnapshot(m){
 }
 
 // ---- HOST ----
+function shortRoomCode(){ const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s='';
+  for(let i=0;i<4;i++)s+=A[Math.floor(Math.random()*A.length)]; return s; }
 function hostGame(){
   if(typeof Peer==='undefined'){alert('Multiplayer needs internet (PeerJS failed to load).');return;}
   if(NET.peer)return;
   NET.pendingHost=true; netStatus('starting host…');
-  NET.peer=new Peer();
-  NET.peer.on('open',id=>{ NET.roomId=id; netStatus('ROOM CODE: '+id+'\nnow pick your machine ↓'); netBadge('HOST · room:\n'+id); });
+  _startHostPeer();
+}
+function _startHostPeer(){
+  const code=shortRoomCode();
+  NET.peer=new Peer('pxw'+code);          // namespaced id so the short code can't clash with other PeerJS apps
+  NET.peer.on('open',()=>{ NET.roomId=code; netStatus('ROOM CODE: '+code+'\nnow pick your machine ↓'); netBadge('HOST · room:\n'+code); });
   NET.peer.on('connection',c=>{
     NET.conns.push(c);
     c.on('open',()=>{ try{c.send({type:'world',world:serWorld()});}catch(e){} });
@@ -6266,7 +6267,8 @@ function hostGame(){
     c.on('close',()=>removeConn(c));
     c.on('error',()=>removeConn(c));
   });
-  NET.peer.on('error',e=>{ netStatus('connection error: '+e.type); });
+  NET.peer.on('error',e=>{ if(e.type==='unavailable-id'){ try{NET.peer.destroy();}catch(_){} NET.peer=null; _startHostPeer(); return; }
+    netStatus('connection error: '+e.type); });
 }
 function removeConn(c){ const i=NET.conns.indexOf(c); if(i>=0)NET.conns.splice(i,1);
   if(c.playerEnt){ c.playerEnt.dead=true; c.playerEnt.noRespawn=true; c.playerEnt.gone=true; } }
@@ -6334,13 +6336,13 @@ function netHostBroadcast(){ if(gtime%2)return; const snap=buildSnapshot();
 // ---- CLIENT ----
 function joinGame(){
   if(typeof Peer==='undefined'){alert('Multiplayer needs internet (PeerJS failed to load).');return;}
-  const code=(prompt('Enter the room code from the host:')||'').trim();
+  const code=(prompt('Enter the 4-letter room code from the host:')||'').trim().toUpperCase();
   if(!code)return;
   // team is chosen with the TEAM button on the menu (BLUE = same team as the host = co-op)
   netStatus('connecting as '+NET.side.toUpperCase()+'…');
   NET.peer=new Peer();
   NET.peer.on('open',()=>{
-    const conn=NET.peer.connect(code,{reliable:true}); NET.conn=conn;
+    const conn=NET.peer.connect('pxw'+code,{reliable:true}); NET.conn=conn;
     conn.on('open',()=>{ netStatus('connected — pick your machine ↓'); buildCards('picker',netClientPick); });
     conn.on('data',m=>{ try{clientOnData(m);}catch(err){showErr('net: '+err.message);} });
     conn.on('close',()=>netStatus('disconnected from host'));
