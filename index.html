@@ -676,8 +676,8 @@ const VEH={
   // ===== VAULT V — the impossible craft, a knot in time =====
   paradox:{name:'[SEALED]',cls:'plane',hp:800000,acc:0.24,maxs:22.0,mins:0,turn:0.2,
     dmg:45,reload:6,shell:24,rng:1300,sz:24,col:'#1b1030',armor:0,pen:9999,stealth:true,notarget:true,nocrash:true,
-    missile:null,misscd:0,twobullets:true,rewind:true,stasis:true,echofork:true,quicken:true,foresight:true,timestop:true,entropy:true,art:'paradox',secret:true,tier5:true,
-    arm:'VAULT V · A KNOT IN TIME · CLICK: time-bullets (Q: REVERSE/ERASE) · Z: rewind battlefield · N: TIME STOP · B: stasis · F: entropy field · V: echo fork · X: time-skip · G: foresight',
+    missile:null,misscd:0,twobullets:true,rewind:true,stasis:true,echofork:true,quicken:true,foresight:true,timestop:true,entropy:true,timereset:true,art:'paradox',secret:true,tier5:true,
+    arm:'VAULT V · A KNOT IN TIME · CLICK: time-bullets (Q) · Z: rewind · N: TIME STOP · T: YEAR ZERO (reset the enemy team) · B: stasis · F: entropy · V: echo fork · X: skip · G: foresight',
     desc:'[SEALED]',ico:'paradox time craft'},
 };
 // global durability buff: every unit gets 50% more health
@@ -3179,6 +3179,7 @@ function handleKey(e){
     flash(player.bulletMode?'⌦ ERASE ROUND — one-taps any plane it hits':'↺ REVERSE ROUND — rewinds the plane it hits'); e.preventDefault(); }
   if(k==='n'&&player&&!player.dead&&player.spec.timestop)timeStop(player);
   if(k==='f'&&player&&!player.dead&&player.spec.entropy)entropyField(player);
+  if(k==='t'&&player&&!player.dead&&player.spec.timereset)yearZero(player);
   if(k==='c'&&player&&!player.dead&&player.spec.cls==='plane')popFlares(player);
   // TEMPEST storm-powers — Q cycles the selected power, a mouse CLICK fires it.
   // number row 1-9,0 + Shift+1..5 jump straight to a power (then click to use).
@@ -4094,6 +4095,7 @@ function recordHistory(p){
   if(s.foresight&&p.foreCd>0)p.foreCd--;
   if(s.timestop&&p.tstopCd>0)p.tstopCd--;
   if(s.entropy&&p.entCd>0)p.entCd--;
+  if(s.timereset&&p.resetCd>0)p.resetCd--;
   // Time-Skip: fast-forwarding yourself leaves a smear of after-images
   if(p.skipT>0){ p.skipT--; if(gtime%3===0)parts.push({x:p.x,y:p.y,vx:0,vy:0,t:0,life:12,r:3,c:'#cbb6ff'}); }
   // Foresight: slip the timeline — untouchable, and nearby enemy aim goes haywire
@@ -4233,6 +4235,21 @@ function drawEntropy(){
     ctx.globalAlpha=0.5;ctx.strokeStyle='#caf';ctx.setLineDash([6,6]);
     ctx.beginPath();ctx.arc(sx,sy,z.r,0,TAU);ctx.stroke();ctx.setLineDash([]);
     ctx.restore(); }
+}
+
+// ── T: Year Zero ── collapse the enemy's whole timeline. Every unit on the opposing team is reset
+// to nothing (erased; they respawn from scratch) and your team is awarded a point for each.
+function yearZero(p){
+  if((p.resetCd||0)>0){flash('⟲ YEAR ZERO RECHARGING… '+Math.ceil(p.resetCd/60)+'s');return;}
+  p.resetCd=1800;                       // 30s — it wipes the whole enemy team
+  let n=0;
+  for(const e of ents){ if(e.dead||e.team===p.team)continue;
+    const og=e.ghostT; e.ghostT=0; hit(e,1e9,p); e.ghostT=og;   // hit() credits a point to p's team per kill
+    boom(e.x,e.y,e.spec.sz*1.6,'#b89cff'); n++; }
+  shake=Math.min(60,shake+45);
+  flash('⟲⟲⟲ YEAR ZERO — the enemy timeline is reset. +'+n+' to '+(p.team==='blue'?'BLUE':'RED'));
+  for(let i=0;i<60;i++){const a=Math.random()*TAU,sp=Math.random()*6+1;
+    parts.push({x:p.x,y:p.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,t:0,life:30,r:3+Math.random()*4,c:Math.random()<.5?'#b89cff':'#fff'});}
 }
 
 // ── HOLD Z: Rewind Time (the WHOLE world) ── while flying PARADOX, record the entire battlefield
@@ -5567,6 +5584,7 @@ function update(){
       +(player.spec.foresight?`<br><span style="color:#9df">👁 G: foresight${(player.foreT||0)>0?' ACTIVE':((player.foreCd||0)>0?' ('+Math.ceil(player.foreCd/60)+'s)':' READY')}</span>`:'')
       +(player.spec.timestop?`<br><span style="color:#e8eeff">⏱ N: time stop${timeStopped?' ⏸ ON (N=resume)':' (N=freeze)'}</span>`:'')
       +(player.spec.entropy?`<br><span style="color:#caf">⌗ F: entropy field${(player.entCd||0)>0?' ('+Math.ceil(player.entCd/60)+'s)':' READY'}</span>`:'')
+      +(player.spec.timereset?`<br><span style="color:#d8b6ff">⟲ T: YEAR ZERO${(player.resetCd||0)>0?' ('+Math.ceil(player.resetCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.kinetic?`<br><span style="color:#7fd9ff">🛰 X: rods from God${rodCd>0?' ('+Math.ceil(rodCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.cls==='plane'?`<br><span style="color:#fc6">🔥 C: flares${(player.flareCd||0)>0?' ('+Math.ceil(player.flareCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.noGun?'<br><span style="color:#9cf">👻 STEALTH — no guns aboard</span>':'')
