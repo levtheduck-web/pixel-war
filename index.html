@@ -4110,14 +4110,14 @@ function recordHistory(p){
 // ── X: Time-Skip ── fast-forward YOUR craft: ×1.8 speed and triple-rate cooldowns for ~5s. ──
 function timeSkip(p){
   if((p.skipCd||0)>0){flash('⏩ TIME-SKIP RECHARGING… '+Math.ceil(p.skipCd/60)+'s');return;}
-  p.skipCd=540; p.skipT=300;
+  p.skipCd=0; p.skipT=300;
   flash('⏩⏩⏩ TIME-SKIP — you fast-forward; the world slows to watch.');
   blip(400,1600,0.2,'sawtooth',0.22,p.x,p.y);
 }
 // ── G: Foresight ── slip a few seconds ahead of the timeline: untouchable, enemy aim scrambled. ──
 function foresight(p){
   if((p.foreCd||0)>0){flash('👁 FORESIGHT RECHARGING… '+Math.ceil(p.foreCd/60)+'s');return;}
-  p.foreCd=720; p.foreT=240;
+  p.foreCd=0; p.foreT=240;
   flash('👁👁👁 FORESIGHT — you dodge what has not happened yet.');
   blip(900,300,0.25,'sine',0.2,p.x,p.y);
 }
@@ -4127,7 +4127,7 @@ function foresight(p){
 // when the field lifts, every frozen round flies back the way it came — at the people who fired it.
 function stasisField(p){
   if((p.stasisCd||0)>0){flash('⏸ STASIS RECHARGING… '+Math.ceil(p.stasisCd/60)+'s');return;}
-  p.stasisCd=480;
+  p.stasisCd=0;
   stasisFields.push({x:mouse.wx,y:mouse.wy,r:300,t:0,life:240,team:p.team,owner:p,shots:[]});
   flash('⏸⏸⏸ STASIS FIELD — time stops inside. their bullets are waiting.');
 }
@@ -4164,7 +4164,7 @@ function drawStasis(){
 // foes with predestination, then collapse back out of existence. Only one of you was ever real.
 function echoFork(p){
   if((p.echoCd||0)>0){flash('⧉ ECHO FORK RECHARGING… '+Math.ceil(p.echoCd/60)+'s');return;}
-  p.echoCd=600;
+  p.echoCd=0;
   for(let i=0;i<3;i++){ const a=p.ang+(i-1)*0.6;
     const e=makeVeh(p.key,p.team,p.x+Math.cos(a)*40,p.y+Math.sin(a)*40);
     e.ai=true; e.echo=true; e.echoT=360; e.noRespawn=true; e.netId=++NET.idc;
@@ -4215,7 +4215,7 @@ function drawTimeStopOverlay(){
 let entropyZones=[];
 function entropyField(p){
   if((p.entCd||0)>0){flash('⌗ ENTROPY RECHARGING… '+Math.ceil(p.entCd/60)+'s');return;}
-  p.entCd=540; entropyZones.push({x:mouse.wx,y:mouse.wy,r:300,t:0,life:300,team:p.team,owner:p});
+  p.entCd=0; entropyZones.push({x:mouse.wx,y:mouse.wy,r:300,t:0,life:300,team:p.team,owner:p});
   flash('⌗⌗⌗ ENTROPY FIELD — inside, the years pour by. everything ages to dust.');
 }
 function updateEntropy(){
@@ -4241,7 +4241,7 @@ function drawEntropy(){
 // to nothing (erased; they respawn from scratch) and your team is awarded a point for each.
 function yearZero(p){
   if((p.resetCd||0)>0){flash('⟲ YEAR ZERO RECHARGING… '+Math.ceil(p.resetCd/60)+'s');return;}
-  p.resetCd=1800;                       // 30s — it wipes the whole enemy team
+  p.resetCd=0;                          // no cooldown
   let n=0;
   for(const e of ents){ if(e.dead||e.team===p.team)continue;
     const og=e.ghostT; e.ghostT=0; hit(e,1e9,p); e.ghostT=og;   // hit() credits a point to p's team per kill
