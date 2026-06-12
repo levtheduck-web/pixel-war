@@ -675,8 +675,8 @@ const VEH={
   // ===== VAULT V — the impossible craft, a knot in time =====
   paradox:{name:'[SEALED]',cls:'plane',hp:800000,acc:0.24,maxs:22.0,mins:0,turn:0.2,
     dmg:45,reload:6,shell:24,rng:1300,sz:24,col:'#1b1030',armor:0,pen:9999,stealth:true,notarget:true,nocrash:true,
-    missile:null,misscd:0,twobullets:true,rewind:true,stasis:true,echofork:true,quicken:true,foresight:true,art:'paradox',secret:true,tier5:true,
-    arm:'VAULT V · A KNOT IN TIME · CLICK: time-bullets · Q: switch REVERSE/ERASE · HOLD Z: rewind the battlefield · B: stasis · V: echo fork · X: time-skip · G: foresight',
+    missile:null,misscd:0,twobullets:true,rewind:true,stasis:true,echofork:true,quicken:true,foresight:true,timestop:true,entropy:true,art:'paradox',secret:true,tier5:true,
+    arm:'VAULT V · A KNOT IN TIME · CLICK: time-bullets (Q: REVERSE/ERASE) · Z: rewind battlefield · N: TIME STOP · B: stasis · F: entropy field · V: echo fork · X: time-skip · G: foresight',
     desc:'[SEALED]',ico:'paradox time craft'},
 };
 // global durability buff: every unit gets 50% more health
@@ -3176,6 +3176,8 @@ function handleKey(e){
   if(k==='g'&&player&&!player.dead&&player.spec.foresight)foresight(player);
   if(k==='q'&&player&&!player.dead&&player.spec.twobullets){ player.bulletMode=player.bulletMode?0:1;
     flash(player.bulletMode?'⌦ ERASE ROUND — one-taps any plane it hits':'↺ REVERSE ROUND — rewinds the plane it hits'); e.preventDefault(); }
+  if(k==='n'&&player&&!player.dead&&player.spec.timestop)timeStop(player);
+  if(k==='f'&&player&&!player.dead&&player.spec.entropy)entropyField(player);
   if(k==='c'&&player&&!player.dead&&player.spec.cls==='plane')popFlares(player);
   // TEMPEST storm-powers — Q cycles the selected power, a mouse CLICK fires it.
   // number row 1-9,0 + Shift+1..5 jump straight to a power (then click to use).
@@ -3545,7 +3547,7 @@ function fireMain(p){
 //   ERASE   (mode 1): one-tap — the plane it hits is simply erased from existence
 function fireParadoxBullet(p,a){
   const s=p.spec, mode=p.bulletMode||0;
-  p.cd = (mode===1) ? s.reload*5 : s.reload;     // the erase round fires far slower
+  p.cd = (mode===1) ? s.reload*2 : s.reload;     // erase round: still slower than reverse, but snappy
   const sp=(Math.random()-.5)*0.04, col=(mode===1)?'#b89cff':'#9cf';
   shells.push({x:p.x+Math.cos(a)*s.sz,y:p.y+Math.sin(a)*s.sz,
     vx:Math.cos(a+sp)*s.shell,vy:Math.sin(a+sp)*s.shell,
@@ -4089,6 +4091,8 @@ function recordHistory(p){
   if(s.echofork&&p.echoCd>0)p.echoCd=Math.max(0,p.echoCd-fast);
   if(s.quicken&&p.skipCd>0)p.skipCd--;
   if(s.foresight&&p.foreCd>0)p.foreCd--;
+  if(s.timestop&&p.tstopCd>0)p.tstopCd--;
+  if(s.entropy&&p.entCd>0)p.entCd--;
   // Time-Skip: fast-forwarding yourself leaves a smear of after-images
   if(p.skipT>0){ p.skipT--; if(gtime%3===0)parts.push({x:p.x,y:p.y,vx:0,vy:0,t:0,life:12,r:3,c:'#cbb6ff'}); }
   // Foresight: slip the timeline — untouchable, and nearby enemy aim goes haywire
@@ -4176,6 +4180,57 @@ function updateEchoes(){
       if(best){ e.echoFire=42; best.fateT=Math.max(best.fateT||0,90); best.fateBy=e;
         for(let i=0;i<6;i++){const a=Math.random()*TAU;parts.push({x:best.x,y:best.y,vx:Math.cos(a)*2,vy:Math.sin(a)*2,t:0,life:14,r:2,c:'#b89cff'});} } }
   }
+}
+
+// ── N: Time Stop ── the world holds its breath. Every other unit AND every enemy bullet freezes
+// solid for ~3s; only you keep moving and firing. (THE WORLD.)
+let timeStopT=0, timeStopBy=null;
+function timeStop(p){
+  if((p.tstopCd||0)>0){flash('⏱ TIME-STOP RECHARGING… '+Math.ceil(p.tstopCd/60)+'s');return;}
+  p.tstopCd=900; timeStopT=200; timeStopBy=p;
+  flash('⏱⏱⏱ TIME STOP — the world holds its breath. only you move.');
+  shake=Math.min(60,shake+12);
+}
+function updateTimeStop(){
+  if(timeStopT<=0)return; timeStopT--;
+  const me=timeStopBy, mt=me&&me.team;
+  for(const e of ents){ if(e.dead||e===me)continue; e.stunT=Math.max(e.stunT||0,3); e.vx=0;e.vy=0;e.spd=0; }
+  for(const sh of shells){ if(sh.team===mt)continue; sh.vx=0;sh.vy=0; }
+  for(const m of missiles){ if(m.team===mt)continue; m.vx=0;m.vy=0; }
+}
+function drawTimeStopOverlay(){
+  if(timeStopT<=0)return; const fade=Math.min(1,timeStopT/30);
+  ctx.save();
+  ctx.globalAlpha=0.10*fade;ctx.fillStyle='#b0c0e0';ctx.fillRect(0,0,W,H);
+  ctx.globalAlpha=0.9;ctx.fillStyle='#e8eeff';ctx.textAlign='center';
+  ctx.font='bold 26px ui-monospace,monospace';ctx.fillText('⏱ TIME STOPPED',W/2,H-46);
+  ctx.restore();
+}
+// ── F: Entropy Field ── a zone where time races forward: enemies inside AGE — taking damage that
+// ramps up the longer they linger, until they crumble to dust.
+let entropyZones=[];
+function entropyField(p){
+  if((p.entCd||0)>0){flash('⌗ ENTROPY RECHARGING… '+Math.ceil(p.entCd/60)+'s');return;}
+  p.entCd=540; entropyZones.push({x:mouse.wx,y:mouse.wy,r:300,t:0,life:300,team:p.team,owner:p});
+  flash('⌗⌗⌗ ENTROPY FIELD — inside, the years pour by. everything ages to dust.');
+}
+function updateEntropy(){
+  for(const z of entropyZones){ z.t++;
+    const ramp=1+z.t/45;
+    for(const e of ents){ if(e.dead||e.team===z.team)continue;
+      if(Math.hypot(e.x-z.x,e.y-z.y)<z.r&&gtime%4===0)hit(e,40*ramp,z.owner); }
+    if(gtime%3===0){const a=Math.random()*TAU,rr=Math.random()*z.r;
+      parts.push({x:z.x+Math.cos(a)*rr,y:z.y+Math.sin(a)*rr,vx:0,vy:-0.3,t:0,life:30,r:2+Math.random()*3,c:'#b89cff',smoke:true});}
+  }
+  for(let i=entropyZones.length-1;i>=0;i--)if(entropyZones[i].t>entropyZones[i].life)entropyZones.splice(i,1);
+}
+function drawEntropy(){
+  for(const z of entropyZones){ const sx=z.x-cam.x, sy=z.y-cam.y;
+    ctx.save();
+    ctx.globalAlpha=0.10;ctx.fillStyle='#b89cff';ctx.beginPath();ctx.arc(sx,sy,z.r,0,TAU);ctx.fill();
+    ctx.globalAlpha=0.5;ctx.strokeStyle='#caf';ctx.setLineDash([6,6]);
+    ctx.beginPath();ctx.arc(sx,sy,z.r,0,TAU);ctx.stroke();ctx.setLineDash([]);
+    ctx.restore(); }
 }
 
 // ── HOLD Z: Rewind Time (the WHOLE world) ── while flying PARADOX, record the entire battlefield
@@ -5441,7 +5496,7 @@ function update(){
   tempestTick(player);
   updateShells();updateBombs();updateNukes();updateMissiles();updateParts();updateFloaters();updateCPs();updateWrecks();updateSonicRings();updateBlackHoles();updateRods();updateBases();updateBolts();updateStormZones();
   try{ updateIonBeams();updateShieldDome();updateLance();updateMeteors();updateFimbul();updateEnder();
-       updateFate();updateStasis();updateEchoes(); }
+       updateFate();updateStasis();updateEchoes();updateTimeStop();updateEntropy(); }
   catch(err){ showErr('⚠ vault-power update: '+err.message); }
   // carriers catapult escort jets into the fight (max 2 aloft per carrier)
   if(gtime%720===300)for(const c of ents){
@@ -5508,6 +5563,8 @@ function update(){
       +(player.spec.echofork?`<br><span style="color:#caf">⧉ V: echo fork${(player.echoCd||0)>0?' ('+Math.ceil(player.echoCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.quicken?`<br><span style="color:#cbb6ff">⏩ X: time-skip${(player.skipT||0)>0?' ACTIVE':((player.skipCd||0)>0?' ('+Math.ceil(player.skipCd/60)+'s)':' READY')}</span>`:'')
       +(player.spec.foresight?`<br><span style="color:#9df">👁 G: foresight${(player.foreT||0)>0?' ACTIVE':((player.foreCd||0)>0?' ('+Math.ceil(player.foreCd/60)+'s)':' READY')}</span>`:'')
+      +(player.spec.timestop?`<br><span style="color:#e8eeff">⏱ N: time stop${timeStopT>0?' ACTIVE':((player.tstopCd||0)>0?' ('+Math.ceil(player.tstopCd/60)+'s)':' READY')}</span>`:'')
+      +(player.spec.entropy?`<br><span style="color:#caf">⌗ F: entropy field${(player.entCd||0)>0?' ('+Math.ceil(player.entCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.kinetic?`<br><span style="color:#7fd9ff">🛰 X: rods from God${rodCd>0?' ('+Math.ceil(rodCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.cls==='plane'?`<br><span style="color:#fc6">🔥 C: flares${(player.flareCd||0)>0?' ('+Math.ceil(player.flareCd/60)+'s)':' READY'}</span>`:'')
       +(player.spec.noGun?'<br><span style="color:#9cf">👻 STEALTH — no guns aboard</span>':'')
@@ -5560,7 +5617,7 @@ function render(){
   else shake=0;
   drawGround();drawDecals();drawWrecks();drawProps();drawCPs();
   drawBombs(); drawNukes(); drawSonicRings(); drawBlackHoles(); drawRods(); drawStormZones(); drawBolts();
-  drawShieldDome(); drawIonBeams(); drawMeteors(); drawLance(); drawStasis(); drawFate();
+  drawShieldDome(); drawIonBeams(); drawMeteors(); drawLance(); drawStasis(); drawFate(); drawEntropy();
   drawActivePaths();
   // each entity draws inside its own try — one bad sprite reports itself instead of blacking the map
   const safeDraw=e=>{ const tf=ctx.getTransform();
@@ -5580,6 +5637,7 @@ function render(){
   drawFimbulOverlay();   // RAGNAROK's Fimbulwinter freezes the whole screen pale
   drawEnderOverlay();    // World-Ender flash
   drawRewindOverlay();   // PARADOX rewinding the whole battlefield
+  drawTimeStopOverlay(); // PARADOX time-stop
   // war-film vignette (cached per resize)
   if(!render.vig||render.vw!==W||render.vh!==H){
     const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.45,W/2,H/2,Math.max(W,H)*0.72);
@@ -5791,7 +5849,7 @@ function startGame(key){
   document.getElementById('start').style.display='none';
   ents=[];shells=[];parts=[];bombs=[];nukes=[];floaters=[];missiles=[];artCd=0;nukeFlash=0;
   carrierStrikeCd=0;empCd=0;hpassCd=0;swarmCd=0;rodCd=0;ionCd=0;shieldCd=0;lanceCd=0;meteorStormCd=0;fimbulCd=0;fimbulT=0;enderCd=0;enderFlash=0;meteorBarrage=null;ionBeams.length=0;meteors.length=0;
-  sonicRings.length=0;blackHoles.length=0;rods.length=0;bolts.length=0;stormZones.length=0;stasisFields.length=0;
+  sonicRings.length=0;blackHoles.length=0;rods.length=0;bolts.length=0;stormZones.length=0;stasisFields.length=0;entropyZones.length=0;timeStopT=0;
   SCORE.blue=0;SCORE.red=0;SCORE.over=false;myKills=0;
   genCPs();
   wrecks=[];decals=[];
