@@ -666,7 +666,7 @@ const VEH={
   // a land dreadnought — also unlocks with the tier-2 code
   megatank:{name:'MEGA TANK',cls:'tank',hp:1000000000000000,acc:1.2,maxs:39,rev:21,turn:0.2,turret:0.28,
     dmg:1000000,reload:6,shell:50,rng:1100,sz:38,col:'#2b2f38',armor:600,pen:9999,
-    missile:'ANY',misscd:120,crush:true,coax:true,smoke:true,nocrash:true,earthshaker:true,siegestrike:true,art:'maus',secret:true,tier2:true,
+    missile:'ANY',misscd:120,crush:true,coax:true,smoke:true,nocrash:true,amphib:true,earthshaker:true,siegestrike:true,art:'maus',secret:true,tier2:true,
     arm:'TIER II · MEGA TANK · 10,000,000 HP · 1,000,000 dmg hyper-velocity cannon · F: EARTHSHAKER · G: SIEGE STRIKE · auto coax MG · missiles (R) · crushes everything',
     desc:'MEGA TANK — a land dreadnought. Ten million health, a rapid hyper-velocity cannon that deletes anything in one hit, a coaxial MG that auto-fires on anything close, guided missiles, and it flattens forests and rocks. F = EARTHSHAKER (a shockwave that obliterates everything it rolls over). G = SIEGE STRIKE (a giant shell detonates wherever you aim).',ico:'mega tank land dreadnought'},
   // ===== VAULT III — orbital tier, sealed behind a third codeword =====
@@ -3360,7 +3360,7 @@ function moveEnt(e){
   if(s.cls==='ship'){ if(!wet){ // bounce off shore
       e.vx*=-0.3;e.vy*=-0.3;e.spd*=-0.3; nx=e.x;ny=e.y; } }
   else if(s.cls==='tank'){
-    if(wet&&!onBridge(nx,ny)){ e.vx*=-0.4;e.vy*=-0.4;e.spd*=-0.4; nx=e.x;ny=e.y; }
+    if(wet&&!onBridge(nx,ny)&&!s.amphib){ e.vx*=-0.4;e.vy*=-0.4;e.spd*=-0.4; nx=e.x;ny=e.y; }
     // the 188-tonne super heavy simply flattens trees in its path
     if(s.crush)for(let i=trees.length-1;i>=0;i--){const o=trees[i];
       if(Math.hypot(nx-o.x,ny-o.y)<o.r+s.sz*0.4){
