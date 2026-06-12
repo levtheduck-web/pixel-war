@@ -6330,9 +6330,8 @@ function joinGame(){
   if(typeof Peer==='undefined'){alert('Multiplayer needs internet (PeerJS failed to load).');return;}
   const code=(prompt('Enter the room code from the host:')||'').trim();
   if(!code)return;
-  const side=(prompt('Which side? type  blue  or  red','blue')||'blue').toLowerCase();
-  NET.side=(side==='red')?'red':'blue';
-  netStatus('connecting…');
+  // team is chosen with the TEAM button on the menu (BLUE = same team as the host = co-op)
+  netStatus('connecting as '+NET.side.toUpperCase()+'…');
   NET.peer=new Peer();
   NET.peer.on('open',()=>{
     const conn=NET.peer.connect(code,{reliable:true}); NET.conn=conn;
@@ -6376,12 +6375,18 @@ function setupNetUI(){
   const bar=document.createElement('div');
   bar.style.cssText='margin:10px auto 0;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap';
   bar.innerHTML='<button id="net-host" class="again" style="font-size:15px;padding:8px 16px">🌐 HOST ONLINE</button>'
+    +'<button id="net-team" class="again" style="font-size:15px;padding:8px 16px">TEAM: BLUE</button>'
     +'<button id="net-join" class="again" style="font-size:15px;padding:8px 16px">🔗 JOIN ONLINE</button>'
     +'<span id="net-status" style="color:#7fd9ff;font:12px ui-monospace,monospace"></span>';
   const picker=document.getElementById('picker');
   host.insertBefore(bar,picker);
   document.getElementById('net-host').onclick=hostGame;
   document.getElementById('net-join').onclick=joinGame;
+  const tb=document.getElementById('net-team');
+  function _updTeam(){ tb.textContent='TEAM: '+NET.side.toUpperCase()+(NET.side==='blue'?' (with host)':' (vs host)');
+    tb.style.color=NET.side==='blue'?'#6cf':'#f77'; }
+  tb.onclick=()=>{ NET.side=NET.side==='red'?'blue':'red'; _updTeam(); };
+  _updTeam();
 }
 setupNetUI();
 
