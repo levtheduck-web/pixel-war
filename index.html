@@ -6153,6 +6153,8 @@ function buildSnapshot(){
              met:meteors.map(z=>({x:z.x,y:z.y,t:z.t,fuse:z.fuse})),
              rod:rods.map(z=>({x:z.x,y:z.y,t:z.t,fuse:z.fuse})),
              st:stasisFields.map(z=>({x:z.x,y:z.y,r:z.r,t:z.t})),
+             en:entropyZones.map(z=>({x:z.x,y:z.y,r:z.r})),
+             ts:timeStopped?1:0, rw:rewinding?1:0,
              fim:fimbulT, end:enderFlash };
   return {type:'snap',e,sh,ms,cp,sc:[SCORE.blue,SCORE.red,SCORE.goal],fx};
 }
@@ -6169,6 +6171,8 @@ function clientApplySnapshot(m){
   meteors.length=0;(m.fx.met||[]).forEach(z=>meteors.push(z));
   rods.length=0;(m.fx.rod||[]).forEach(z=>rods.push(z));
   stasisFields.length=0;(m.fx.st||[]).forEach(z=>stasisFields.push({x:z.x,y:z.y,r:z.r,t:z.t,life:1e9,shots:[]}));
+  entropyZones.length=0;(m.fx.en||[]).forEach(z=>entropyZones.push({x:z.x,y:z.y,r:z.r,t:0,life:1e9}));
+  timeStopped=!!m.fx.ts; rewinding=!!m.fx.rw;   // visual-only on the client (host drives the real state)
   fimbulT=m.fx.fim||0; enderFlash=m.fx.end||0;
   player=ents.find(e=>e.netId===NET.myId)||player;
   const bs=document.getElementById('bscore'),rs=document.getElementById('rscore');
